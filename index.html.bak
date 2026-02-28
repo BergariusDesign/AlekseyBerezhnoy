@@ -535,6 +535,7 @@ body.modal-open {
     /* 5. ЛАЙТБОКС (Картинки на весь экран) */
     .lightbox-img {
         max-height: 75vh !important;
+		width: 100% !important;
     }
 	
 	.compare-img {
