@@ -1441,8 +1441,11 @@ function closeLightbox() {
             if(activeStepId) { document.getElementById(activeStepId)?.scrollIntoView({behavior: 'smooth', block: 'center'}); }
         }
 
-        // --- ЛОГИКА АДМИНКИ И СЧЕТЧИКА ---
+        / --- ЛОГИКА АДМИНКИ И СЧЕТЧИКА ---
         const namespace = 'aleksey-portfolio';
+        // 👇 НЕ ЗАБУДЬ ВСТАВИТЬ СВОЙ КЛЮЧ 👇
+        const API_KEY = 'ut_q4PvvnKoqZH0RgjnlAGOZGNc0MqLfeGr78sk8WZs'; 
+
         const adminModal = document.getElementById('admin-modal');
         const adminLoginView = document.getElementById('admin-login-view');
         const adminStatsView = document.getElementById('admin-stats-view');
@@ -1486,12 +1489,16 @@ function closeLightbox() {
 
             for (let key in projectsData) {
                 const projectTitle = projectsData[key].title['en']; 
-                // ✅ ИСПРАВЛЕННАЯ ССЫЛКА (убрали projects/ и counters/)
-                const p = fetch(`https://api.counterapi.dev/v1/${namespace}/${key}`)
+                // ✅ ИЗМЕНИЛИ v1 НА v2 И ДОБАВИЛИ КЛЮЧ
+                const p = fetch(`https://api.counterapi.dev/v2/${namespace}/${key}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${API_KEY}`
+                    }
+                })
                     .then(res => res.json())
                     .then(data => {
-                        // Берем data.value, так как CounterAPI возвращает значение в value
-                        return { title: projectTitle, val: data.value || data.count || 0 };
+                        return { title: projectTitle, val: data.count || 0 };
                     })
                     .catch(() => { return { title: projectTitle, val: 0 }; });
                 promises.push(p);
@@ -1513,11 +1520,16 @@ function closeLightbox() {
         // Функция для накрутки при просмотре пользователем
         function updateViewCount(projectId) {
             const antiCache = Math.random();
-            // ✅ ИСПРАВЛЕННАЯ ССЫЛКА (убрали projects/ и counters/)
-            fetch(`https://api.counterapi.dev/v1/${namespace}/${projectId}/up?t=${antiCache}`)
+            // ✅ ИЗМЕНИЛИ v1 НА v2 И ДОБАВИЛИ КЛЮЧ
+            fetch(`https://api.counterapi.dev/v2/${namespace}/${projectId}/up?t=${antiCache}`, {
+                method: 'GET', // В v2 лучше явно указывать метод
+                headers: {
+                    'Authorization': `Bearer ${API_KEY}`
+                }
+            })
                 .then(res => res.json())
-                .then(data => console.log(`Просмотр ${projectId} засчитан. Всего: ${data.value || data.count}`))
-                .catch(err => console.log('Счетчик заблокирован браузером...'));
+                .then(data => console.log(`Просмотр ${projectId} засчитан. Всего: ${data.count}`))
+                .catch(err => console.log('Счетчик заблокирован:', err));
         }
 
         const canvas = document.getElementById('neural-canvas');

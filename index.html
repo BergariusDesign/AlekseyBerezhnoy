@@ -1441,9 +1441,11 @@ function closeLightbox() {
             if(activeStepId) { document.getElementById(activeStepId)?.scrollIntoView({behavior: 'smooth', block: 'center'}); }
         }
 
-        // --- ЛОГИКА АДМИНКИ И СЧЕТЧИКА ---
+        / --- ЛОГИКА АДМИНКИ И СЧЕТЧИКА ---
         const namespace = 'aleksey-portfolio';
-		const API_KEY = 'ut_q4PvvnKoqZH0RgjnlAGOZGNc0MqLfeGr78sk8WZs';
+        // 👇 НЕ ЗАБУДЬ ВСТАВИТЬ СВОЙ КЛЮЧ 👇
+        const API_KEY = 'ut_q4PvvnKoqZH0RgjnlAGOZGNc0MqLfeGr78sk8WZs'; 
+
         const adminModal = document.getElementById('admin-modal');
         const adminLoginView = document.getElementById('admin-login-view');
         const adminStatsView = document.getElementById('admin-stats-view');
@@ -1465,7 +1467,7 @@ function closeLightbox() {
         }
 
         async function checkAdminPassword() {
-            const input = adminPassInput.value.trim(); // ДОБАВИЛИ TRIM ДЛЯ ПРЕДОТВРАЩЕНИЯ ОШИБОК С ПРОБЕЛАМИ
+            const input = adminPassInput.value.trim();
             const msgBuffer = new TextEncoder().encode(input);
             const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
             const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -1487,11 +1489,11 @@ function closeLightbox() {
 
             for (let key in projectsData) {
                 const projectTitle = projectsData[key].title['en']; 
-                // ✅ ИЗМЕНИЛИ v1 НА v2 И ДОБАВИЛИ КЛЮЧ
                 const p = fetch(`https://api.counterapi.dev/v2/${namespace}/${key}`, {
                     method: 'GET',
                     headers: {
-                        'Authorization': `Bearer ${API_KEY}`
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'Content-Type': 'application/json' // ✅ ДОБАВЛЕНО СЮДА
                     }
                 })
                     .then(res => res.json())
@@ -1516,13 +1518,13 @@ function closeLightbox() {
         }
 
         // Функция для накрутки при просмотре пользователем
-        function updateViewCount(projectId) {
+        ffunction updateViewCount(projectId) {
             const antiCache = Math.random();
-            // ✅ ИЗМЕНИЛИ v1 НА v2 И ДОБАВИЛИ КЛЮЧ
             fetch(`https://api.counterapi.dev/v2/${namespace}/${projectId}/up?t=${antiCache}`, {
-                method: 'GET', // В v2 лучше явно указывать метод
+                method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${API_KEY}`
+                    'Authorization': `Bearer ${API_KEY}`,
+                    'Content-Type': 'application/json' // ✅ ДОБАВЛЕНО И СЮДА
                 }
             })
                 .then(res => res.json())
