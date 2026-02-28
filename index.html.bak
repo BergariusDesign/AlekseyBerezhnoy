@@ -1507,30 +1507,82 @@ function closeLightbox() {
         const canvas = document.getElementById('neural-canvas');
         const ctx = canvas.getContext('2d');
         let width, height; let particles = [];
-        const properties = { particleColor: 'rgba(255, 255, 255, 0.5)', lineColor: 'rgba(0, 240, 255,', particleCount: 70, connectionDistance: 150 };
-        function resize() { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; }
-        window.addEventListener('resize', resize); resize();
-        class Particle {
-            constructor() { this.x = Math.random() * width; this.y = Math.random() * height; this.vx = (Math.random() - 0.5) * 0.5; this.vy = (Math.random() - 0.5) * 0.5; this.size = Math.random() * 2 + 1; }
-            update() { this.x += this.vx; this.y += this.vy; if (this.x < 0 || this.x > width) this.vx *= -1; if (this.y < 0 || this.y > height) this.vy *= -1; }
-            draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fillStyle = properties.particleColor; ctx.fill(); }
+        let properties = {};
+        
+        // 1. Умные настройки (светлее и меньше на мобильном)
+        function updateProperties() {
+            const isMobile = window.innerWidth < 768;
+            properties = {
+                particleColor: isMobile ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.5)',
+                lineColor: 'rgba(0, 240, 255,',
+                particleCount: isMobile ? 30 : 70, // 30 на телефоне, 70 на ПК
+                connectionDistance: isMobile ? 100 : 150,
+                lineOpacityFactor: isMobile ? 0.3 : 1
+            };
         }
-        function init() { particles = []; for (let i = 0; i < properties.particleCount; i++) { particles.push(new Particle()); } }
+
+        function resize() { 
+            width = canvas.width = window.innerWidth; 
+            height = canvas.height = window.innerHeight; 
+            updateProperties(); // Обновляем при перевороте экрана
+            init(); 
+        }
+        
+        window.addEventListener('resize', resize); 
+
+        class Particle {
+            constructor() { 
+                this.x = Math.random() * width; 
+                this.y = Math.random() * height; 
+                this.vx = (Math.random() - 0.5) * 0.5; 
+                this.vy = (Math.random() - 0.5) * 0.5; 
+                const isMobile = window.innerWidth < 768;
+                this.size = Math.random() * (isMobile ? 1.5 : 2) + 1; 
+            }
+            update() { 
+                this.x += this.vx; this.y += this.vy; 
+                if (this.x < 0 || this.x > width) this.vx *= -1; 
+                if (this.y < 0 || this.y > height) this.vy *= -1; 
+            }
+            draw() { 
+                ctx.beginPath(); 
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); 
+                ctx.fillStyle = properties.particleColor; 
+                ctx.fill(); 
+            }
+        }
+        
+        function init() { 
+            updateProperties();
+            particles = []; 
+            for (let i = 0; i < properties.particleCount; i++) { 
+                particles.push(new Particle()); 
+            } 
+        }
+        
         function animate() {
             ctx.clearRect(0, 0, width, height);
             for (let i = 0; i < particles.length; i++) {
                 particles[i].update(); particles[i].draw();
                 for (let j = i; j < particles.length; j++) {
-                    let dx = particles[i].x - particles[j].x; let dy = particles[i].y - particles[j].y; let distance = Math.sqrt(dx*dx + dy*dy);
+                    let dx = particles[i].x - particles[j].x; 
+                    let dy = particles[i].y - particles[j].y; 
+                    let distance = Math.sqrt(dx*dx + dy*dy);
                     if (distance < properties.connectionDistance) {
-                        let opacity = 1 - (distance / properties.connectionDistance);
-                        ctx.strokeStyle = properties.lineColor + opacity + ')'; ctx.lineWidth = 1;
-                        ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y); ctx.stroke();
+                        // Учитываем фактор прозрачности для мобильных
+                        let opacity = (1 - (distance / properties.connectionDistance)) * properties.lineOpacityFactor;
+                        ctx.strokeStyle = properties.lineColor + opacity + ')'; 
+                        ctx.lineWidth = 1;
+                        ctx.beginPath(); 
+                        ctx.moveTo(particles[i].x, particles[i].y); 
+                        ctx.lineTo(particles[j].x, particles[j].y); 
+                        ctx.stroke();
                     }
                 }
             }
             requestAnimationFrame(animate);
         }
+        resize(); // Запускаем при старте
         // 1. Слушаем скролл сайта
         window.addEventListener('scroll', function() {
             const btn = document.getElementById('scrollTopBtn');
