@@ -1708,6 +1708,17 @@ document.getElementById('lightbox-compare-box').addEventListener('touchmove', fu
     if (e.cancelable) e.preventDefault(); 
 }, { passive: false });
 
+window.addEventListener('resize', () => {
+    const compareBox = document.getElementById('lightbox-compare-box');
+    const imgBefore = document.getElementById('lb-img-before');
+    const imgAfter = document.getElementById('lb-img-after');
+    
+    if (compareBox && compareBox.style.display === 'block') {
+        const currentWidth = compareBox.offsetWidth;
+        imgBefore.style.width = currentWidth + 'px';
+        imgAfter.style.width = currentWidth + 'px';
+    }
+});
     </script>
 </body>
 </html>

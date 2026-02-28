@@ -505,6 +505,24 @@ body.modal-open {
             padding-left: 0 !important; 
             margin-bottom: 50px !important;
         }
+		
+		header {
+    flex-direction: column; /* Ставим логотип и кнопки друг под другом */
+    gap: 15px;
+    margin-bottom: 40px;
+    align-items: center;
+    text-align: center;
+}
+
+.logo {
+    font-size: 20px !important; /* Немного уменьшаем логотип */
+}
+
+.header-right {
+    gap: 15px; /* Уменьшаем расстояние между статусом и кнопками RU/EN */
+    width: 100%;
+    justify-content: center;
+}
 
         .step-text, .step-visual { 
             width: 100% !important; 
