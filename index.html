@@ -459,69 +459,62 @@
 
         /* --- АДАПТИВНОСТЬ (МОБИЛЬНАЯ ВЕРСИЯ) --- */
     @media (max-width: 768px) {
-    /* 1. Карточки и сетка */
+    /* 1. ГЛАВНОЕ: Убираем "колбасу" - расширяем блоки на всю ширину */
+    .timeline-step { 
+        flex-direction: column !important; 
+        align-items: flex-start !important;
+        padding-left: 10px !important; 
+        margin-bottom: 60px !important;
+    }
+
+    .step-text, .step-visual { 
+        width: 100% !important; /* Текст теперь занимает всё пространство */
+        padding: 0 !important;
+    }
+
+    .step-text p {
+        font-size: 16px !important;
+        line-height: 1.5;
+        max-width: 100%; /* Снимаем ограничение ширины */
+    }
+
+    /* 2. Карточки на главной */
     .grid { 
         display: flex; 
         flex-direction: column; 
         gap: 20px; 
-        width: 100%;
     }
     .col-8, .col-4, .col-6 { 
-        width: 100%; 
+        width: 100% !important; 
         height: auto; 
         min-height: 250px; 
-        aspect-ratio: 16/9; 
     }
 
-    /* 2. Исправляем BIO (about-section), чтобы он не распирал экран */
-    .about-section {
-        flex-direction: column !important;
-        gap: 30px !important;
-        margin-top: 80px !important;
-        padding: 0 10px;
-    }
-    .about-img {
-        width: 100% !important;
-        height: 400px !important;
-    }
+    /* 3. Убираем лишние отступы всего сайта */
+    .wrapper { padding: 15px; }
 
-    /* 3. Кнопки и навигация */
-    .scroll-to-top { bottom: 90px; right: 20px; }
-    .contact-float { 
-        bottom: 20px; 
-        left: 20px; 
-        width: 50px; 
-        height: 50px; 
-        padding: 0; 
-        border-radius: 50%; 
-    }
-    .contact-float span { display: none; } 
-
-    /* 4. ШРИФТЫ (чтобы не вылезали за края) */
-    h1 { font-size: 42px !important; }
-    .hero p { font-size: 15px; padding-left: 15px; }
+    /* 4. Шрифты и заголовки */
+    h1 { font-size: 40px !important; letter-spacing: -1px; }
+    .hero p { font-size: 15px; padding-left: 15px; border-left: 2px solid var(--accent-glow); }
     .project-header h2 { font-size: 28px !important; }
-	
-	 footer { flex-direction: column-reverse; gap: 20px; text-align: center; }
-    .social-links { gap: 20px; }
-    .social-icon svg { width: 24px; height: 24px; } /* Фикс размера иконок */
+    
+    .step-number { font-size: 40px; position: static; margin-bottom: 10px; color: var(--accent-glow); opacity: 0.5; }
 
-    /* 5. ЛАЙТБОКС (Изображения на весь экран) */
+    /* 5. ЛАЙТБОКС (Картинки на весь экран) */
     .lightbox-img { 
-        max-width: 100% !important; 
-        max-height: 90vh !important; 
+        max-width: 100vw !important; 
+        max-height: 80vh !important; 
+        width: 100% !important;
         object-fit: contain; 
         border: none !important;
     }
-    .modal-close {
-        top: 10px;
-        right: 20px;
-        font-size: 35px;
-    }
-    #lightbox-compare-box {
-        width: 100%;
-        height: 60vh;
-    }
+    
+    #lightbox-compare-box { width: 100vw; height: 50vh; }
+    .modal-close { top: 10px; right: 15px; font-size: 40px; }
+
+    /* 6. Футер и иконки */
+    footer { flex-direction: column-reverse; gap: 20px; text-align: center; }
+    .social-links { justify-content: center; gap: 30px; }
 }
     
    
