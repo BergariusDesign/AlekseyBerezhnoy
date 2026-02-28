@@ -310,25 +310,29 @@ body.modal-open {
         /* --- СЛАЙДЕР ДО/ПОСЛЕ --- */
         .compare-container { position: relative; width: 100%; height: 100%; overflow: hidden; }
         .compare-img {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100% !important;
-    object-fit: cover !important; /* Чтобы вертикальное видео не растягивалось */
-    pointer-events: none;
-    display: block;
-}
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100% !important;
+            width: auto; /* Убрали 100% !important */
+            object-fit: contain !important; 
+            pointer-events: none;
+            display: block;
+        }
         .img-after-wrapper {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: 50%;
-    overflow: hidden;
-    border-right: 2px solid var(--accent-glow);
-    z-index: 2;
-}
-        .img-after-wrapper .compare-img { width: 100% !important; height: 100%; object-fit: cover !important; }
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 50%;
+            overflow: hidden;
+            border-right: 2px solid var(--accent-glow);
+            z-index: 2;
+        }
+        .img-after-wrapper .compare-img { 
+            width: auto; 
+            max-width: none !important; /* Критично: запрещает картинке сжиматься вместе с оберткой */
+        }
         .label {
             position: absolute; top: 20px; font-family: var(--font-tech); font-size: 10px; padding: 4px 8px;
             background: rgba(0,0,0,0.6); border: 1px solid var(--glass-border); border-radius: 4px; color: #fff; pointer-events: none; z-index: 10;
@@ -554,7 +558,7 @@ body.modal-open {
             display: block;
             width: auto; 
             height: 100% !important;
-            object-fit: cover !important;
+            object-fit: contain !important;
             pointer-events: none;
         }
         
@@ -1387,21 +1391,20 @@ window.addEventListener('resize', () => {
                 lbImgBefore.src = 'images/' + beforeSrc;
                 lbImgAfter.src = 'images/' + src;
 
-                // ФИКС: Принудительно задаем ширину в пикселях, чтобы картинка не "ехала" за ползунком
+                // ФИКС: Жестко блокируем ширину картинок в пикселях, 
+                // чтобы "After" не масштабировалась при движении ползунка
                 const syncSizes = () => {
-                    const boxWidth = compareBox.offsetWidth;
+                    const boxWidth = compareBox.clientWidth; // Берем чистую ширину контейнера
                     if (boxWidth > 0) {
                         lbImgBefore.style.width = boxWidth + 'px';
-                        lbImgBefore.style.maxWidth = 'none';
                         lbImgAfter.style.width = boxWidth + 'px';
-                        lbImgAfter.style.maxWidth = 'none';
                         afterWrapper.style.width = '50%';
                     }
                 };
                 
-                // Запускаем через небольшую паузу, чтобы iPhone успел отрисовать модалку
+                // Запускаем сразу и через микро-паузу для надежности
+                syncSizes();
                 setTimeout(syncSizes, 100);
-                setTimeout(syncSizes, 300);
 
             } else {
                 compareBox.style.display = 'none';
