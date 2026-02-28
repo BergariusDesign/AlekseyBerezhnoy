@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aleksej Berezhnoj | Motion Design</title>
+    <style>
+        /* --- СТИЛИ (CSS) --- */
+        :root {
+            --bg-deep: #050507; 
+            --glass-bg: rgba(255, 255, 255, 0.03); 
+            --glass-border: rgba(255, 255, 255, 0.08); 
+            --accent-glow: #00f0ff; /* Неоновый Циан */
+            --text-main: #ffffff;
+            --text-muted: #8b9bb4;
+            --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-tech: 'Courier New', Courier, monospace;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            font-family: var(--font-main);
+            margin: 0; padding: 0; overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+
+        #neural-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background: radial-gradient(circle at center, #0b1023 0%, #000000 100%); }
+
+        .wrapper { max-width: 1400px; margin: 0 auto; padding: 40px 20px; position: relative; z-index: 1; }
+
+        /* HEADER */
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 80px; }
+        
+        .logo { 
+            font-weight: 700; font-size: 24px; letter-spacing: -0.5px; 
+            background: linear-gradient(90deg, #fff, var(--text-muted)); 
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; cursor: pointer; 
+        }
+
+        .header-right { display: flex; align-items: center; gap: 30px; }
+
+        .status-container { display: flex; align-items: center; }
+        .status-dot { height: 8px; width: 8px; background-color: var(--accent-glow); border-radius: 50%; display: inline-block; box-shadow: 0 0 12px var(--accent-glow); margin-right: 8px; }
+        .status-text { font-size: 14px; color: var(--text-muted); font-weight: 500; font-family: var(--font-tech); text-transform: uppercase; letter-spacing: 1px;}
+
+        /* ЯЗЫКОВЫЕ КНОПКИ */
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn {
+            background: transparent; border: 1px solid var(--glass-border);
+            color: var(--text-muted); padding: 5px 12px; border-radius: 20px;
+            font-family: var(--font-tech); font-size: 12px; cursor: pointer; transition: 0.3s;
+        }
+        .lang-btn:hover { border-color: var(--accent-glow); color: #fff; }
+        .lang-btn.active {
+            background: rgba(0, 240, 255, 0.1); border-color: var(--accent-glow);
+            color: var(--accent-glow); box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+        }
+
+        /* HERO & GRID */
+        #main-view { display: block; animation: fadeIn 0.8s ease forwards; }
+        .hero { margin-bottom: 120px; position: relative; }
+        h1 { 
+            font-size: clamp(48px, 9vw, 130px); line-height: 0.95; margin: 0; font-weight: 800; letter-spacing: -0.04em; 
+            background: linear-gradient(180deg, #ffffff 0%, #666 100%); 
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+        }
+        .hero p { 
+            font-size: 18px; color: var(--text-muted); max-width: 480px; margin-top: 30px; line-height: 1.6; 
+            border-left: 2px solid var(--accent-glow); padding-left: 20px; 
+        }
+
+        .grid { display: grid; grid-template-columns: repeat(12, 1fr); grid-auto-rows: minmax(300px, auto); gap: 24px; }
+        .card { 
+            background: var(--glass-bg); border: 1px solid var(--glass-border); 
+            border-radius: 24px; overflow: hidden; position: relative; backdrop-filter: blur(12px); 
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.3s; 
+            display: flex; flex-direction: column; justify-content: flex-end; cursor: pointer; 
+        }
+        .card:hover { transform: translateY(-5px) scale(1.01); border-color: rgba(255, 255, 255, 0.3); box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+        .card video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; opacity: 0.6; transition: opacity 0.5s ease; mix-blend-mode: screen; pointer-events: none; }
+        .card:hover video { opacity: 1; mix-blend-mode: normal; }
+        .card-content { position: relative; z-index: 2; padding: 30px; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); }
+        .card-title { font-size: 24px; margin: 0 0 5px 0; color: #fff; pointer-events: none;}
+        .card-tag { 
+            font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-family: var(--font-tech);
+            color: var(--accent-glow); border: 1px solid rgba(0, 240, 255, 0.3); 
+            padding: 4px 10px; border-radius: 20px; display: inline-block; pointer-events: none; 
+        }
+        .col-8 { grid-column: span 8; height: 500px; }
+        .col-4 { grid-column: span 4; height: 500px; }
+        .col-6 { grid-column: span 6; height: 350px; }
+        @media (max-width: 1024px) { .col-8, .col-4, .col-6 { grid-column: span 12; height: 400px; } h1 { font-size: 60px; } }
+
+        /* --- СТРАНИЦА ПРОЕКТА --- */
+        #project-view { display: none; opacity: 0; padding-top: 20px; }
+        
+        .back-btn {
+            background: none; border: 1px solid var(--glass-border);
+            color: var(--text-muted); padding: 10px 20px; border-radius: 30px;
+            cursor: pointer; transition: 0.3s; margin-bottom: 40px;
+            display: inline-flex; align-items: center; gap: 10px; font-size: 14px; font-family: var(--font-tech);
+        }
+        .back-btn:hover { border-color: var(--accent-glow); color: #fff; background: rgba(255,255,255,0.05); }
+
+        .project-header { margin-bottom: 60px; }
+        .project-header h2 { font-size: clamp(32px, 5vw, 60px); margin: 0 0 20px 0; }
+        .project-meta { display: flex; gap: 20px; margin-bottom: 60px; color: var(--text-muted); font-family: var(--font-tech); font-size: 12px;}
+        
+        /* ПЛЕЕР */
+        .video-wrapper {
+            position: relative; padding: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent-glow), transparent);
+            margin-bottom: 80px; border-radius: 4px;
+        }
+        .main-project-video {
+            width: 100%; border-radius: 4px; border: none;
+            margin-bottom: 0; aspect-ratio: 16/9; object-fit: cover; background: #000;
+        }
+
+        .return-overlay-btn {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(0, 0, 0, 0.8); border: 1px solid var(--accent-glow);
+            color: #fff; padding: 10px 20px; border-radius: 30px;
+            cursor: pointer; z-index: 50;
+            display: flex; align-items: center; gap: 10px;
+            font-family: var(--font-tech); font-size: 12px;
+            opacity: 0; visibility: hidden; pointer-events: none;
+            transition: 0.3s; box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+        }
+        .return-overlay-btn.active { opacity: 1; visibility: visible; pointer-events: all; }
+        .return-overlay-btn:hover { background: var(--accent-glow); color: #000; box-shadow: 0 0 30px rgba(0, 240, 255, 0.5); }
+
+        /* --- ТАЙМЛАЙН --- */
+        .process-section { position: relative; max-width: 1000px; margin: 0 auto 100px auto; padding: 20px 0; }
+        .process-section::before {
+            content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px;
+            background: linear-gradient(to bottom, transparent, var(--accent-glow), transparent);
+            transform: translateX(-50%); z-index: 0; opacity: 0.3;
+        }
+        .timeline-step { display: flex; justify-content: space-between; align-items: center; margin-bottom: 100px; position: relative; z-index: 1; }
+        .timeline-step:nth-child(even) { flex-direction: row-reverse; }
+        .step-text { width: 42%; padding: 20px; }
+        .step-text h3 {
+            font-size: 14px; color: var(--accent-glow); letter-spacing: 2px; text-transform: uppercase;
+            margin-bottom: 10px; display: flex; align-items: center; gap: 10px; font-family: var(--font-tech);
+        }
+        .step-number {
+            font-size: 80px; font-weight: 900; color: rgba(255,255,255,0.03);
+            position: absolute; margin-top: -60px; z-index: -1; font-family: 'Inter', sans-serif;
+        }
+        .step-text h4 { font-size: 24px; margin: 0 0 15px 0; color: #fff; }
+        .step-text p { color: var(--text-muted); line-height: 1.6; font-size: 15px; }
+        .step-visual { width: 45%; display: flex; flex-direction: column; gap: 20px; } 
+        
+        /* 3D КАРТОЧКА */
+        .process-card {
+            height: 250px; width: 100%; position: relative;
+            border-radius: 12px; overflow: hidden;
+            border: 1px solid var(--glass-border);
+            background: #000;
+            transform-style: preserve-3d; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            cursor: zoom-in;
+        }
+        .process-img { 
+            width: 100%; height: 100%; object-fit: contain; 
+            opacity: 0.8; transition: 0.5s; filter: grayscale(100%); pointer-events: none;
+            background: #080808; 
+        }
+        .process-card:hover { border-color: var(--accent-glow); box-shadow: 0 0 50px rgba(0, 240, 255, 0.3); z-index: 100; }
+        .process-card:hover .process-img { opacity: 1; filter: grayscale(0%); }
+
+        /* Локальный кружочек для каждой рамки */
+        .frame-indicator {
+            position: absolute; left: 50%; width: 10px; height: 10px;
+            background: var(--bg-deep); border: 2px solid var(--accent-glow);
+            border-radius: 50%; transform: translateX(-50%);
+            box-shadow: 0 0 10px var(--accent-glow); z-index: 5;
+        }
+
+        /* --- СЛАЙДЕР ДО/ПОСЛЕ --- */
+        .compare-container { position: relative; width: 100%; height: 100%; overflow: hidden; }
+        .compare-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; user-select: none; }
+        .img-after-wrapper {
+            position: absolute; top: 0; left: 0; width: 50%; height: 100%;
+            overflow: hidden; z-index: 2;
+            border-right: 1px solid var(--accent-glow);
+            box-shadow: 5px 0 20px rgba(0, 240, 255, 0.2);
+            will-change: width;
+        }
+        .img-after-wrapper .compare-img { width: 100vw; max-width: none; }
+        .label {
+            position: absolute; top: 20px; font-family: var(--font-tech); font-size: 10px; padding: 4px 8px;
+            background: rgba(0,0,0,0.6); border: 1px solid var(--glass-border); border-radius: 4px; color: #fff; pointer-events: none; z-index: 10;
+        }
+        .label-before { right: 20px; }
+        .label-after { left: 20px; color: var(--accent-glow); border-color: var(--accent-glow); }
+        .timeline-dot {
+            position: absolute; left: 50%; width: 12px; height: 12px;
+            background: #050507; border: 2px solid var(--accent-glow);
+            border-radius: 50%; transform: translateX(-50%);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        /* --- ВЕРТИКАЛЬНАЯ СТОПКА (ДРУГ ПОД ДРУГОМ) --- */
+        .vertical-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 25px; /* Отступ между элементами */
+            width: 100%;
+        }
+        .vertical-stack .process-card {
+            height: 280px; /* Фиксированная высота для красоты */
+            width: 100%;
+        }
+
+        /* --- РЕЖИМ РЕКОНСТРУКЦИИ (AE UI) --- */
+        .card.locked { pointer-events: none; user-select: none; overflow: hidden; }
+        
+        .ae-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #161616; z-index: 50;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            border: 1px solid #333;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .ae-preview-box {
+            width: 80%; height: 40%; background: #000; border: 1px solid #444; margin-bottom: 15px;
+            position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
+        }
+        .ae-checkerboard {
+            position: absolute; top:0; left:0; width: 100%; height: 100%;
+            background-image: linear-gradient(45deg, #222 25%, transparent 25%), linear-gradient(-45deg, #222 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #222 75%), linear-gradient(-45deg, transparent 75%, #222 75%);
+            background-size: 20px 20px; opacity: 0.3;
+        }
+        .ae-render-text {
+            color: #ccc; font-size: 12px; z-index: 2; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .ae-render-dots { animation: blinkDots 1.5s infinite; }
+        .ae-timeline { width: 80%; display: flex; flex-direction: column; gap: 6px; position: relative; }
+        .ae-layer { height: 12px; width: 100%; background: #2a2a2a; border-radius: 2px; position: relative; overflow: hidden; }
+        .ae-layer::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+        .layer-1::before { background: #A629FF; } .layer-2::before { background: #FF6829; } .layer-3::before { background: #29FF96; }
+        .ae-keyframe {
+            position: absolute; top: 2px; width: 8px; height: 8px; background: #bbb; transform: rotate(45deg); box-shadow: 0 0 2px rgba(0,0,0,0.5);
+        }
+        .ae-playhead {
+            position: absolute; top: -5px; bottom: -5px; width: 2px; background: #FF0000; z-index: 10; left: 0;
+            box-shadow: 0 0 5px rgba(255, 0, 0, 0.4); animation: aePlay 3s linear infinite;
+        }
+        .ae-playhead::before {
+            content: ''; position: absolute; top: 0; left: -4px; width: 10px; height: 8px; background: #FF0000; clip-path: polygon(0% 0%, 100% 0%, 100% 70%, 50% 100%, 0% 70%);
+        }
+        @keyframes aePlay { 0% { left: 10%; } 100% { left: 90%; } }
+        @keyframes blinkDots { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
+
+        /* --- ПРОЧЕЕ --- */
+        .scroll-to-top {
+            position: fixed; bottom: 40px; right: 40px; width: 50px; height: 50px;
+            background: rgba(5, 5, 7, 0.8); border: 1px solid var(--accent-glow); border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; cursor: pointer;
+            z-index: 900; opacity: 0; visibility: hidden; transition: all 0.3s ease;
+            backdrop-filter: blur(5px); box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+        }
+        .scroll-to-top.show { opacity: 1; visibility: visible; }
+        .scroll-to-top:hover { transform: translateY(-5px); box-shadow: 0 0 25px rgba(0, 240, 255, 0.6); background: rgba(0, 240, 255, 0.1); }
+        .scroll-to-top svg { width: 24px; height: 24px; fill: none; stroke: var(--accent-glow); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        .contact-float {
+            position: fixed; bottom: 40px; left: 40px; height: 50px;
+            background: rgba(5, 5, 7, 0.8); border: 1px solid var(--accent-glow); border-radius: 30px; 
+            display: flex; align-items: center; justify-content: center; padding: 0 25px; gap: 12px;
+            cursor: pointer; z-index: 900; color: #fff; text-decoration: none;
+            backdrop-filter: blur(5px); box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+            transition: all 0.3s ease; font-family: var(--font-tech); font-size: 14px; letter-spacing: 1px;
+        }
+        .contact-float:hover { transform: translateY(-5px); box-shadow: 0 0 30px rgba(0, 240, 255, 0.5); background: rgba(0, 240, 255, 0.1); color: var(--accent-glow); }
+        .contact-float svg { width: 20px; height: 20px; fill: currentColor; }
+
+        /* --- МОДАЛЬНЫЕ ОКНА --- */
+        .modal {
+            display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.95); backdrop-filter: blur(5px);
+            justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s;
+        }
+        .modal.active { display: flex; opacity: 1; }
+        .modal-close { position: absolute; top: 30px; right: 40px; color: #fff; font-size: 40px; font-weight: bold; cursor: pointer; transition: 0.3s; z-index: 1000;}
+        .modal-close:hover { color: var(--accent-glow); }
+
+        .lightbox-content { display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%; justify-content: center; }
+        .lightbox-img { max-width: 95%; max-height: 85%; border-radius: 4px; box-shadow: 0 0 50px rgba(0, 240, 255, 0.2); border: 1px solid var(--accent-glow); transform: scale(0.9); transition: transform 0.3s; margin-bottom: 20px; }
+        .modal.active .lightbox-img { transform: scale(1); }
+
+        /* ЛАЙТБОКС СЛАЙДЕР */
+        #lightbox-compare-box {
+            width: 90%; height: 85%; max-width: 1400px;
+            border: 1px solid var(--accent-glow); border-radius: 4px; box-shadow: 0 0 50px rgba(0, 240, 255, 0.2); display: none;
+        }
+        #lightbox-compare-box .compare-img { width: 100%; height: 100%; object-fit: cover; }
+        #lightbox-compare-box .img-after-wrapper .compare-img { width: auto; max-width: none; height: 100%; }
+
+        .lightbox-play-btn {
+            background: rgba(0, 0, 0, 0.7); border: 1px solid var(--accent-glow); color: #fff; padding: 12px 25px; border-radius: 30px; cursor: pointer;
+            font-family: var(--font-tech); font-size: 14px; display: flex; align-items: center; gap: 10px; transition: 0.3s; box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+        }
+        .lightbox-play-btn:hover { background: var(--accent-glow); color: #000; box-shadow: 0 0 40px rgba(0, 240, 255, 0.6); transform: scale(1.05); }
+        .lightbox-play-btn svg { width: 16px; height: 16px; fill: currentColor; }
+
+        .contact-modal-box {
+            background: rgba(10, 10, 15, 0.9); border: 1px solid var(--glass-border); padding: 40px; border-radius: 20px;
+            width: 100%; max-width: 500px; box-shadow: 0 0 50px rgba(0, 0, 0, 0.8); position: relative;
+        }
+        .contact-title { font-size: 24px; margin: 0 0 30px 0; color: #fff; text-align: center; font-family: var(--font-tech); }
+        .email-copy-row { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--glass-border); }
+        .my-email { font-family: var(--font-tech); color: var(--accent-glow); font-size: 14px; }
+        .copy-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px; text-transform: uppercase; transition: 0.3s; }
+        .copy-btn:hover { color: #fff; }
+        .contact-textarea {
+            width: 100%; height: 120px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+            border-radius: 8px; color: #fff; padding: 15px; font-family: var(--font-main); font-size: 14px; resize: none; margin-bottom: 20px; outline: none; box-sizing: border-box;
+        }
+        .contact-textarea:focus { border-color: var(--accent-glow); }
+        .send-btn {
+            width: 100%; padding: 15px; background: var(--accent-glow); border: none; border-radius: 8px;
+            color: #000; font-weight: 700; cursor: pointer; font-family: var(--font-tech); font-size: 14px; letter-spacing: 1px; transition: 0.3s;
+        }
+        .send-btn:hover { box-shadow: 0 0 20px var(--accent-glow); transform: translateY(-2px); }
+        .send-btn:disabled { background: #333; color: #666; cursor: not-allowed; box-shadow: none; transform: none; }
+
+        /* --- СОЦСЕТИ И АДМИНКА --- */
+        .social-icon.vk:hover { color: #0077FF; filter: drop-shadow(0 0 10px #0077FF); transform: translateY(-3px) scale(1.1); }
+        
+        /* TELEGRAM (СИНИЙ) */
+        .social-icon.tg:hover { color: #229ED9; filter: drop-shadow(0 0 10px #229ED9); transform: translateY(-3px) scale(1.1); }
+        
+        .social-icon.admin-lock:hover { color: #fff; filter: drop-shadow(0 0 10px #fff); transform: translateY(-3px) scale(1.1); }
+        
+        /* ВАЖНО: Фикс размера иконок */
+        .social-icon svg { width: 24px; height: 24px; fill: currentColor; }
+
+        /* Стили для админ-панели */
+        .admin-input-row { display: flex; gap: 10px; margin-bottom: 20px; }
+        .admin-input { flex: 1; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); color: #fff; border-radius: 8px; font-family: var(--font-tech); outline: none;}
+        .admin-stats-list { max-height: 300px; overflow-y: auto; text-align: left; border-top: 1px solid var(--glass-border); padding-top: 20px; }
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-family: var(--font-tech); font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 5px; }
+        .stat-name { color: var(--text-muted); }
+        .stat-val { color: var(--accent-glow); font-weight: bold; }
+
+        /* --- АДАПТИВНОСТЬ ОТ ПОЛЬЗОВАТЕЛЯ (ИСПРАВЛЕННАЯ) --- */
+        @media (max-width: 768px) {
+            /* Сетка проектов в колонку */
+            .grid { display: flex; flex-direction: column; gap: 20px; }
+            .col-8, .col-4, .col-6 { width: 100%; height: auto; min-height: 280px; aspect-ratio: 16/9; }
+
+            /* Таймлайн */
+            .process-section::before { left: 15px; }
+            .timeline-step { flex-direction: column; align-items: flex-start; margin-bottom: 50px; padding-left: 40px; }
+            .timeline-step:nth-child(even) { flex-direction: column; }
+            .timeline-dot { left: 9px; width: 14px; height: 14px; }
+            .step-text, .step-visual { width: 100%; }
+            .step-text { padding: 0 0 20px 0; }
+            .step-text h3 { font-size: 12px; margin-top: 5px; }
+
+            /* Кнопки */
+            .scroll-to-top { bottom: 90px; right: 20px; width: 40px; height: 40px; }
+            .contact-float { bottom: 20px; left: 20px; right: auto; width: 50px; height: 50px; padding: 0; border-radius: 50%; justify-content: center; }
+            .contact-float span { display: none; } 
+
+            /* Лайтбокс */
+            .lightbox-img { max-width: 100%; max-height: 85vh; object-fit: contain; margin-bottom: 60px; }
+            #lightbox-compare-box { width: 100%; height: 50vh; margin-bottom: 20px; }
+            .contact-modal-box { width: 90%; padding: 25px; max-width: none; }
+
+            /* Футер на мобильном */
+            footer { flex-direction: column-reverse; gap: 20px; text-align: center; }
+            .social-links { gap: 20px; }
+            /* Дублируем фикс иконок для надежности */
+            .social-icon svg { width: 24px; height: 24px; } 
+
+            /* Шрифты */
+            h1 { font-size: 48px !important; }
+            .hero p { font-size: 16px; padding-right: 10px; }
+            .project-header h2 { font-size: 32px !important; line-height: 1.1; }
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        footer { margin-top: auto; border-top: 1px solid var(--glass-border); padding: 40px 0; color: var(--text-muted); font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+        .social-links { display: flex; gap: 25px; align-items: center; }
+        .social-icon { color: var(--text-muted); transition: all 0.3s ease; display: flex; align-items: center; text-decoration: none; cursor: pointer;}
+    </style>
+</head>
+<body>
+
+    <canvas id="neural-canvas"></canvas>
+
+    <div class="scroll-to-top" id="scrollTopBtn" onclick="scrollToTop()">
+        <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"></polyline></svg>
+    </div>
+
+    <div class="contact-float" onclick="toggleContact()">
+        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        <span data-i18n="contact-btn">ОБСУДИТЬ ПРОЕКТ</span>
+    </div>
+
+    <div id="contact-modal" class="modal">
+        <span class="modal-close" onclick="toggleContact()">&times;</span>
+        <div class="contact-modal-box">
+            <h2 class="contact-title" data-i18n="contact-title">СВЯЗАТЬСЯ СО МНОЙ</h2>
+            <div class="email-copy-row">
+                <span class="my-email" id="display-email">...</span>
+                <button class="copy-btn" onclick="copyEmail()" data-i18n="copy-btn">КОПИРОВАТЬ</button>
+            </div>
+            <textarea class="contact-textarea" id="contact-msg" placeholder="Опишите вашу задачу..." data-i18n-placeholder="contact-placeholder"></textarea>
+            <button class="send-btn" id="send-btn" onclick="sendToMail()" data-i18n="send-btn">ОТПРАВИТЬ ПИСЬМО</button>
+        </div>
+    </div>
+
+    <div id="admin-modal" class="modal">
+        <span class="modal-close" onclick="toggleAdmin()">&times;</span>
+        <div class="contact-modal-box">
+            <h2 class="contact-title">STATISTICS</h2>
+            
+            <div id="admin-login-view">
+                <div class="admin-input-row">
+                    <input type="password" id="admin-pass" class="admin-input" placeholder="Enter Password">
+                    <button class="send-btn" style="width: auto;" onclick="checkAdminPassword()">LOGIN</button>
+                </div>
+            </div>
+
+            <div id="admin-stats-view" style="display: none;">
+                <div class="admin-stats-list" id="stats-list-container">
+                    <div style="text-align: center; color: #666;">Loading data...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="lightbox" class="modal">
+        <span class="modal-close" onclick="closeLightbox()">&times;</span>
+        <div class="lightbox-content">
+            <img class="lightbox-img" id="lightbox-img" src="">
+            <div id="lightbox-compare-box" class="compare-container">
+                <div class="label label-before">RAW / WIRE</div>
+                <img id="lb-img-before" src="" class="compare-img" alt="Before">
+                <div id="lb-after-wrapper" class="img-after-wrapper">
+                    <div class="label label-after">FINAL</div>
+                    <img id="lb-img-after" src="" class="compare-img" alt="After">
+                </div>
+            </div>
+            <button id="lightbox-play-btn" class="lightbox-play-btn">
+                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                <span id="lightbox-play-text" data-i18n="lightbox-play-tpl">СМОТРЕТЬ МОМЕНТ</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="wrapper">
+        <header>
+            <div class="logo" onclick="showMain()">BERGARIUS.DESIGN</div>
+            <div class="header-right">
+                <div class="status-container">
+                    <span class="status-dot"></span>
+                    <span class="status-text" data-i18n="status">Open to create</span>
+                </div>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLanguage('ru')">RU</button>
+                    <button class="lang-btn" onclick="setLanguage('en')">EN</button>
+                </div>
+            </div>
+        </header>
+
+        <div id="main-view">
+            <section class="hero">
+                <h1>DIGITAL<br>ALCHEMY</h1>
+                <p data-i18n="hero-desc">Соединяю искусство моушн-дизайна с генеративными нейросетями. Создаю визуальные миры, где технология обретает душу.</p>
+            </section>
+            <div class="grid">
+                
+                <div class="card col-8" onclick="openProject('magic')">
+                    <video autoplay loop muted playsinline><source src="qw.mp4" type="video/mp4"></video>
+                    <div class="card-content"> <span class="card-tag">AI Cinematic</span>
+                        <h3 class="card-title">The Only Wall is You</h3></div>
+                </div>
+                
+                <div class="card col-4" onclick="openProject('app')">
+                    <video autoplay loop muted playsinline><source src="Pre-comp 1_1.mp4" type="video/mp4"></video>
+                    <div class="card-content"><span class="card-tag">UI / UX Motion</span><h3 class="card-title">App Interface</h3></div>
+                </div>
+                
+                <div class="card col-6 locked"> 
+                    <div class="ae-overlay">
+                        <div class="ae-preview-box">
+                            <div class="ae-checkerboard"></div>
+                            <div class="ae-render-text">Rendering<span class="ae-render-dots">...</span></div>
+                        </div>
+                        <div class="ae-timeline">
+                            <div class="ae-playhead"></div> 
+                            <div class="ae-layer layer-1"><div class="ae-keyframe" style="left: 20%"></div><div class="ae-keyframe" style="left: 60%"></div></div>
+                            <div class="ae-layer layer-2"><div class="ae-keyframe" style="left: 40%"></div><div class="ae-keyframe" style="left: 80%"></div></div>
+                            <div class="ae-layer layer-3"><div style="position:absolute; left:30%; right:10%; top:3px; height:6px; background:rgba(41, 255, 150, 0.3); border:1px solid #29FF96;"></div></div>
+                        </div>
+                    </div>
+                    <div style="width:100%; height:100%; position: absolute; background: #000;"></div>
+                    <div class="card-content">
+                        <span class="card-tag">Portfolio</span>
+                        <h3 class="card-title">Showreel 2026</h3>
+                    </div>
+                </div>
+                
+                <div class="card col-6" onclick="openProject('neural')">
+                    <div style="width:100%; height:100%; position: absolute; background: linear-gradient(135deg, #0f0c29, #302b63);"></div>
+                    <div class="card-content"><span class="card-tag">Generative Art</span><h3 class="card-title">Neural Experiments</h3></div>
+                </div>
+
+            </div>
+        </div>
+
+        <div id="project-view">
+            <button class="back-btn" onclick="showMain()" data-i18n="back-btn">← ВЕРНУТЬСЯ НАЗАД</button>
+            <div class="project-header">
+                <h2 id="p-title">Project Name</h2>
+                <div class="project-meta">
+                    <span id="p-tag">CATEGORY</span> <span>•</span> <span>2026</span>
+                    </div>
+            </div>
+            <div class="video-wrapper">
+                <video id="p-video" class="main-project-video" controls playsinline></video>
+                <div id="return-btn" class="return-overlay-btn" onclick="returnToStep()">
+                    <span data-i18n="return-btn">↓ ВЕРНУТЬСЯ К ПРОЦЕССУ</span>
+                </div>
+            </div>
+            <div class="process-section" id="process-container"></div>
+        </div>
+
+        <footer>
+            <span data-i18n="copyright">© 2026 Aleksej Berezhnoj</span>
+<div style="font-family: var(--font-tech); font-size: 12px;">MOTION DESIGNER / AI ARTIST</div>
+            <div class="social-links">
+                <a href="https://vk.com/" target="_blank" class="social-icon vk" aria-label="VK"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15.07 2H8.93C3.33 2 2 3.33 2 8.93v6.14C2 20.67 3.33 22 8.93 22h6.14c5.6 0 6.93-1.33 6.93-6.93V8.93C22 3.33 20.67 2 15.07 2zM17.2 16.5h-1.66c-1.35 0-2.07-.67-2.93-1.63-.41-.45-.63-.76-.85-.76-.17 0-.31.2-.31.76v1.07c0 .4-.21.56-1.07.56-2.5 0-4.88-2.67-6.5-6.5 0-.2.1-.4.4-.4h1.66c.45 0 .73.2.93.67 1.04 2.45 2.12 4.17 2.76 4.17.15 0 .23-.1.23-.51v-2.34c-.1-.91-.58-1-1.04-1-.18 0-.31-.05-.31-.25 0-.3.26-.56 1.04-.56h1.25c.56 0 .73.25.73.81v3.25c0 .25.1.35.25.35.16 0 .31-.1.62-.4 1.2-1.78 1.97-3.9 1.97-4.01 0-.15.16-.25.42-.25h1.66c.52 0 .62.25.52.61-.41 1.36-1.56 3.36-2.18 4.22-.4.61-.31.71 0 1.12.93 1.12 1.97 1.83 2.18 2.54.1.25-.1.5-.62.5z"/></svg></a>
+                
+                <a href="https://t.me/USERNAME" target="_blank" class="social-icon tg" aria-label="Telegram">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.665 3.717l-17.73 6.837c-1.21.486-1.203 1.161-.222 1.462l4.552 1.42 10.532-6.645c.498-.303.953-.14.579.192l-8.533 7.701h-.002l.002.001-.314 4.692c.46 0 .663-.211.921-.46l2.211-2.15 4.599 3.397c.848.467 1.457.227 1.668-.785l3.019-14.228c.309-1.239-.473-1.8-1.282-1.434z"/></svg>
+                </a>
+                
+                <div class="social-icon admin-lock" onclick="toggleAdmin()">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const myEmail = "bere3hnoya@gmail.com"; 
+        
+        // ОБЪЯВЛЯЕМ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ РАБОТЫ ВСЕХ ФУНКЦИЙ
+        const lightbox = document.getElementById('lightbox');
+        const returnBtn = document.getElementById('return-btn');
+        const pVideo = document.getElementById('p-video');
+        let currentLang = 'ru'; 
+        let currentProjectId = null; 
+        let activeStepId = null;
+
+        document.getElementById('display-email').innerText = myEmail;
+
+        function sendToMail() {
+            const msg = document.getElementById('contact-msg').value;
+            const btn = document.getElementById('send-btn');
+            if(!msg.trim()) { alert(currentLang === 'ru' ? 'Пожалуйста, напишите сообщение!' : 'Please enter a message!'); return; }
+            const originalText = btn.innerText;
+            btn.innerText = currentLang === 'ru' ? 'ОТПРАВКА...' : 'SENDING...';
+            btn.disabled = true; btn.style.opacity = "0.7";
+            fetch(`https://formsubmit.co/ajax/${myEmail}`, {
+                method: "POST",
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ message: msg, _subject: "Новый заказ (Portfolio Website)" })
+            })
+            .then(response => { if (response.ok) return response.json(); else throw new Error("Network error"); })
+            .then(data => {
+                btn.innerText = currentLang === 'ru' ? 'ОТПРАВЛЕНО!' : 'SENT!';
+                btn.style.background = '#00ff88'; btn.style.color = '#000';
+                document.getElementById('contact-msg').value = '';
+                setTimeout(() => { toggleContact(); btn.disabled = false; btn.innerText = originalText; btn.style.background = ''; btn.style.color = ''; btn.style.opacity = "1"; }, 3000);
+            })
+            .catch(error => {
+                window.location.href = `mailto:${myEmail}?subject=Motion Design Project&body=${encodeURIComponent(msg)}`;
+                btn.disabled = false; btn.innerText = originalText; btn.style.opacity = "1";
+            });
+        }
+
+        const translations = {
+            ru: {
+                "status": "Готов к работе", "hero-desc": "Соединяю искусство моушн-дизайна с генеративными нейросетями. Создаю визуальные миры, где технология обретает душу.",
+                "back-btn": "← ВЕРНУТЬСЯ НАЗАД", "return-btn": "↓ ВЕРНУТЬСЯ К ПРОЦЕССУ", "lightbox-play-tpl": "СМОТРЕТЬ МОМЕНТ", 
+                "copyright": "© 2026 Алексей Бережной", "contact-btn": "ОБСУДИТЬ ПРОЕКТ", "contact-title": "СВЯЗАТЬСЯ СО МНОЙ", "copy-btn": "КОПИРОВАТЬ",
+                "contact-placeholder": "Опишите вашу задачу...", "send-btn": "ОТПРАВИТЬ ПИСЬМО"
+            },
+            en: {
+                "status": "Open to create", "hero-desc": "Combining motion design art with generative neural networks. Creating visual worlds where technology gains a soul.",
+                "back-btn": "← GO BACK", "return-btn": "↓ BACK TO PROCESS", "lightbox-play-tpl": "WATCH MOMENT",
+                "copyright": "© 2026 Aleksej Berezhnoj", "contact-btn": "DISCUSS PROJECT", "contact-title": "CONTACT ME", "copy-btn": "COPY",
+                "contact-placeholder": "Describe your task...", "send-btn": "SEND EMAIL"
+            }
+        };
+
+        const projectsData = {
+            'magic': { 
+                title: { ru: 'Единственная Стена это Ты', en: 'The Only Wall is You' },
+                tag: 'AI Cinematic', 
+                videoSrc: 'qw.mp4',
+                steps: [
+                    { 
+                        num: '01', 
+                        title: {ru: 'Концепт', en: 'Concept'}, 
+                        sub: {ru: 'Moodboard & Prompt Engineering.', en: 'Moodboard & Prompt Engineering.'}, 
+                        desc: {ru: `<b>MOODBOARD & STORYTELLING</b><br>
+Разработка мудборта и референсов. Вначале пути была идея автомобиль в стилистике фильма трон - бекграунты фильма Интерстеллер и идея сценария о преодолении внутренних барьеров, где автомобиль — метафора движение человека преодолевающего трудности которые построил он сам в своей голове.<br><br>
+
+<b>ANCHOR PROMPT ENGINEERING</b><br> 
+Для визуальной целостности был разработан якорный промт, который позволил сохранить единую стилистику автомобиля и окружения на протяжении всего видеоряда.
+Этот промт служил «визуальным cтолпом» проекта при работе с ИИ, гарантируя, что каждая генерация будет соответствовать заданным эстетическим параметрам:
+Он жестко фиксировал материалы, освещение и детализацию, чтобы при смене ракурсов автомобиль оставался узнаваемым.`, en: `<b>MOODBOARD & STORYTELLING</b><br>
+The journey began with the concept of a vehicle in the style of Tron, set against the vast backgrounds of Interstellar. The narrative explores the idea of overcoming internal barriers, where the car serves as a metaphor for a person moving through difficulties they have constructed within their own mind. To ensure visual integrity, an anchor prompt was developed, allowing for a consistent style for both the vehicle and the environment throughout the entire video sequence.<br><br>
+
+<b>ANCHOR PROMPT ENGINEERING</b><br>
+This prompt served as the project’s “visual DNA” when working with AI, ensuring that every generation adhered to the defined aesthetic parameters:
+
+Fixed Visual Identity: The prompt strictly defined materials, lighting, and detailing.
+
+Recognizability: This allowed the vehicle to remain recognizable across various camera angles and scene changes.
+
+Aesthetic Continuity: It ensured that the fusion of sleek carbon fiber and neon accents remained consistent from start to finish..`}, 
+                        img: ['miro.png', 'miro2.png'],
+                    },
+                    { num: '02', 
+                        title: {ru: 'Генерация & Динамика', en: 'Generation & Dynamics'}, 
+    sub: {ru: 'Google Veo, Klingai, NanaBanana, Grok, Claude, Gemini', en: 'Google Veo, Klingai, NanaBanana, Grok, Claude, Gemini'}, 
+    desc: {
+        ru: `<b>AI-DRIVEN PRODUCTION</b><br>
+Переход от концепта к живой динамике. Google Veo и Klingai стали основными инструментами для генерации фотореалистичного движения. Grok, Gemini, Claude использовался для итеративной доработки промптов, что позволило добиться физически корректного поведения песка и частиц при пробуксовке колес, движение камеры,макросьемки и фокусного расстояния.<br><br>
+<b>MATERIAL SYNTHESIS</b><br>
+С помощью NanaBanana были синтезированы сложные материалы: многослойное углеволокно (carbon fiber) и адаптивное неоновое свечение. Это обеспечило визуальную глубину, где каждый блик на кузове подчеркивает аэродинамику гиперкара в движении.`, 
+        en: `<b>AI-DRIVEN PRODUCTION</b><br>
+Transitioning from static concepts to cinematic motion. Google Veo and Klingai served as the primary engines for generating photorealistic dynamics. Grok was used to iteratively refine prompts, achieving physically accurate behavior of sand and sparks during the burnout scenes.<br><br>
+<b>MATERIAL SYNTHESIS</b><br>
+Using NanaBanana, I synthesized complex materials, including multi-layered carbon fiber and adaptive neon lighting. This provided visual depth, where every reflection on the body highlights the hypercar's aerodynamics in motion.`
+    }, 
+    img: ['step2.jpg', 'step2.2.png'], // Здесь две рамки для примера
+    time: 12 }, 
+                    { 
+                        num: '03', 
+                        title: {ru: 'Аудио-инжиниринг', en: 'Audio Engineering'}, 
+                        sub: {ru: 'ElevenLabs, Pixabay & UVR', en: 'ElevenLabs, Pixabay & UVR'}, 
+                        desc: {
+                            ru: `<b>AI VOICEOVER & SFX LAYERING</b><br>
+                            Голос рассказчика сгенерирован в <b>ElevenLabs</b>.<br>
+                            Сложная звуковая картина (Soundscape) собрана из <b>более чем 60 отдельных аудио-слоев</b>: текстурные шумы, кинематографичные переходы (Whoosh), музыка и звуки двигателя с Pixabay.<br><br>
+                            <b>MIXING</b><br>
+                            Для интеграции и разделения на слои я использовал <b>UVR</b>, чтобы очистить частоты и идеально свести этот массив звуков.`, 
+                            en: `<b>AI VOICEOVER & SFX LAYERING</b><br>
+                            Narrator voice generated via <b>ElevenLabs</b>.<br>
+                            The complex soundscape was constructed from <b>over 60 individual audio stems</b> sourced from Pixabay: ambient textures, cinematic whooshes, music bed, and engine SFX.<br><br>
+                            <b>MIXING</b><br>
+                            Used <b>UVR</b> to separate stems and clean frequencies, perfectly mixing this massive array of sounds with aggressive glitch transitions.`
+                        }, 
+                        img: 'step3.png', 
+                        time: 28 
+                    },
+                    { 
+                        num: '04', 
+                        title: {ru: 'VFX & UPSCALING', en: 'VFX & UPSCALING'}, 
+                        sub: {ru: 'After Effects, Video2X', en: 'After Effects, Video2X'}, 
+                        desc: {
+                            ru: `<b>UPSCALING</b><br>
+                            Использование <b>Video2X</b> для апскейла до 4K.<br><br>
+                            <b>VFX INTEGRATION</b><br>
+                            Процедурные эффекты в After Effects:
+                            • <b>Optical Flares</b> для реалистичного света фар.<br>
+                            • <b>Deep Glow</b> для мягкого неонового свечения.<br>
+                            • <b>Pixel Sorter</b> для глитч-перехода.<br><br>
+                            <b>COLOR CORRECTION</b><br>
+                            Финальная цветокоррекция (Color Grading) для выравнивания тональности всех сцен и создания единой «холодной» кинематографичной атмосферы.`, 
+                            en: `<b>UPSCALING</b><br>
+                            Used <b>Video2X</b> for 4K upscaling.<br><br>
+                            <b>VFX INTEGRATION</b><br>
+                            Procedural effects in After Effects:
+                            • <b>Optical Flares</b> for realistic headlights.<br>
+                            • <b>Deep Glow</b> for soft cinematic bloom.<br>
+                            • <b>Pixel Sorter</b> for the glitch transition.<br><br>
+                            <b>COLOR CORRECTION</b><br>
+                            Final color grading to match the tonality of all scenes and establish a unified "cold" cinematic atmosphere.`
+                        }, 
+                        sliders: [
+                            { before: 'step4.png', after: 'step 4.1.png' },
+                            { before: 'step44.png', after: 'step45.png' }
+                        ],
+                        img: [
+                            'interface_ae.jpg',
+                            'nodes.jpg'
+                        ],
+                        time: 35 
+                    }                       
+                ]
+                
+            },
+            'app': { title: { ru: 'Интерфейс Приложения', en: 'App Interface' }, tag: 'UI / UX Motion', videoSrc: 'Pre-comp 1_1.mp4', steps: [] },
+            'reel': { title: { ru: 'Шоурил 2026', en: 'Showreel 2026' }, tag: 'Portfolio', videoSrc: '', steps: [] },
+            'neural': { title: { ru: 'Нейро Эксперименты', en: 'Neural Experiments' }, tag: 'Generative Art', videoSrc: '', steps: [] }
+        };
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.querySelector(`.lang-btn[onclick="setLanguage('${lang}')"]`);
+            if(activeBtn) activeBtn.classList.add('active');
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (translations[lang][key]) el.innerText = translations[lang][key];
+            });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                if (translations[lang][key]) el.placeholder = translations[lang][key];
+            });
+            if (currentProjectId) openProject(currentProjectId, false);
+        }
+
+        const mainView = document.getElementById('main-view');
+        const projectView = document.getElementById('project-view');
+        const processContainer = document.getElementById('process-container');
+
+        function openProject(id, scrollToTop = true) {
+            currentProjectId = id;
+            const data = projectsData[id];
+            
+            document.getElementById('p-title').innerText = data.title[currentLang] || data.title['en'];
+            document.getElementById('p-tag').innerText = data.tag;
+            
+            if(data.videoSrc && pVideo.getAttribute('src') !== data.videoSrc) {
+                pVideo.src = data.videoSrc; pVideo.style.display = 'block';
+            } else if (!data.videoSrc) { pVideo.style.display = 'none'; }
+
+            processContainer.innerHTML = '';
+            
+            if (data.steps) {
+                data.steps.forEach((step, index) => {
+                    const title = step.title[currentLang];
+                    const sub = step.sub[currentLang];
+                    const desc = step.desc[currentLang];
+                    
+                    let contentHTML = '';
+
+                    // 1. СЛАЙДЕРЫ
+                    if (step.sliders) {
+                        step.sliders.forEach((s, i) => {
+                            contentHTML += `
+                                <div class="process-card compare-card" onclick="openLightbox('${s.after}', 0, 'step-${index}-s${i}', '${s.before}')">
+                                    <div class="compare-container">
+                                        <div class="label label-before">RAW</div>
+                                        <img src="images/${s.before}" class="compare-img">
+                                        <div class="img-after-wrapper">
+                                            <div class="label label-after">FINAL</div>
+                                            <img src="images/${s.after}" class="compare-img">
+                                        </div>
+                                    </div>
+                                </div>`;
+                        });
+                    }
+
+                    // 2. ОБЫЧНЫЕ КАРТИНКИ
+                    if (Array.isArray(step.img)) {
+                        step.img.forEach((src, i) => {
+                            contentHTML += `
+                                <div style="position: relative; width: 100%;" id="step-${index}-f${i}">
+                                    <div class="process-card" onclick="openLightbox('${src}', ${step.time || 0}, 'step-${index}-f${i}')">
+                                        <img src="images/${src}" class="process-img">
+                                    </div>
+                                </div>`;
+                        });
+                    } else if (step.img) {
+                        contentHTML += `
+                            <div class="process-card" onclick="openLightbox('${step.img}', ${step.time || 0}, 'step-${index}')">
+                                <img src="images/${step.img}" class="process-img">
+                            </div>`;
+                    }
+
+                    // 3. ОДИНОЧНЫЙ СЛАЙДЕР (старый формат)
+                    if (step.imgBefore && step.imgAfter && !step.sliders) {
+                         contentHTML += `
+                            <div class="process-card compare-card" onclick="openLightbox('${step.imgAfter}', 0, 'step-${index}', '${step.imgBefore}')">
+                                <div class="compare-container">
+                                    <div class="label label-before">RAW</div>
+                                    <img src="images/${step.imgBefore}" class="compare-img">
+                                    <div class="img-after-wrapper">
+                                        <div class="label label-after">FINAL</div>
+                                        <img src="images/${step.imgAfter}" class="compare-img">
+                                    </div>
+                                </div>
+                            </div>`;
+                    }
+
+                    const visualHTML = `<div class="vertical-stack">${contentHTML}</div>`;
+                    
+                    const html = `
+                        <div class="timeline-step" id="step-${index}">
+                            <div class="timeline-dot"></div>
+                            <div class="step-text">
+                                <div class="step-number">${step.num}</div>
+                                <h3>${title}</h3>
+                                <h4>${sub}</h4>
+                                <p>${desc}</p>
+                            </div>
+                            <div class="step-visual">${visualHTML}</div>
+                        </div>
+                    `;
+                    processContainer.insertAdjacentHTML('beforeend', html);
+                });
+                initCards(); initComparisons();
+            }
+
+            mainView.style.display = 'none';
+            projectView.style.display = 'block';
+            
+            if(data.videoSrc && pVideo.paused) {
+                pVideo.muted = false; pVideo.volume = 0.4;
+                const playPromise = pVideo.play();
+                if (playPromise !== undefined) playPromise.catch(e => console.log("Auto-blocked"));
+            }
+            if(scrollToTop) window.scrollTo(0,0);
+            setTimeout(() => { projectView.style.opacity = '1'; projectView.style.animation = 'fadeIn 0.5s ease forwards'; }, 10);
+
+            // ЗАПУСКАЕМ СЧЕТЧИК (+1 просмотр) СКРЫТО
+            updateViewCount(id);
+        }
+
+        function showMain() {
+            currentProjectId = null;
+            pVideo.pause(); pVideo.currentTime = 0;
+            projectView.style.opacity = '0';
+            setTimeout(() => { projectView.style.display = 'none'; mainView.style.display = 'block'; }, 300);
+        }
+
+        function initCards() {
+            const cards = document.querySelectorAll('.process-card');
+            cards.forEach(card => {
+                card.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left; 
+                    const y = e.clientY - rect.top;
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    const rotateX = ((y - centerY) / centerY) * -10; 
+                    const rotateY = ((x - centerX) / centerX) * 10;  
+                    card.style.transform = `scale(1.05) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+                });
+                card.addEventListener('mouseleave', () => { card.style.transform = 'scale(1) rotateX(0) rotateY(0)'; });
+            });
+        }
+
+        function initComparisons() {
+            const wrappers = document.querySelectorAll('.compare-card');
+            wrappers.forEach(card => {
+                const container = card.querySelector('.compare-container');
+                const afterWrapper = card.querySelector('.img-after-wrapper');
+                const afterImg = afterWrapper.querySelector('.compare-img');
+                
+                setTimeout(() => { afterImg.style.width = card.offsetWidth + 'px'; }, 100);
+                window.addEventListener('resize', () => { afterImg.style.width = card.offsetWidth + 'px'; });
+
+                card.addEventListener('mousemove', (e) => {
+                    const rect = container.getBoundingClientRect();
+                    let x = e.clientX - rect.left;
+                    if (x < 0) x = 0; if (x > rect.width) x = rect.width;
+                    afterWrapper.style.width = x + 'px';
+                });
+                card.addEventListener('touchmove', (e) => {
+                    const rect = container.getBoundingClientRect();
+                    let x = e.touches[0].clientX - rect.left;
+                    if (x < 0) x = 0; if (x > rect.width) x = rect.width;
+                    afterWrapper.style.width = x + 'px';
+                });
+            });
+        }
+
+        function initLightboxSlider() {
+            const container = document.getElementById('lightbox-compare-box');
+            const afterWrapper = document.getElementById('lb-after-wrapper');
+            const afterImg = document.getElementById('lb-img-after');
+
+            window.addEventListener('resize', () => {
+                if(container.style.display === 'block') {
+                    afterImg.style.width = container.offsetWidth + 'px';
+                }
+            });
+
+            container.addEventListener('mousemove', (e) => {
+                const rect = container.getBoundingClientRect();
+                let x = e.clientX - rect.left;
+                if (x < 0) x = 0; if (x > rect.width) x = rect.width;
+                afterWrapper.style.width = x + 'px';
+            });
+            container.addEventListener('touchmove', (e) => {
+                const rect = container.getBoundingClientRect();
+                let x = e.touches[0].clientX - rect.left;
+                if (x < 0) x = 0; if (x > rect.width) x = rect.width;
+                afterWrapper.style.width = x + 'px';
+            });
+        }
+
+          function openLightbox(src, time = 0, stepId = '', beforeSrc = '') {
+            activeStepId = stepId;
+            
+            if (beforeSrc) {
+                // Режим сравнения (слайдер)
+                document.getElementById('lightbox-img').style.display = 'none';
+                
+                const compareBox = document.getElementById('lightbox-compare-box');
+                compareBox.style.display = 'block';
+                
+                document.getElementById('lb-img-before').src = 'images/' + beforeSrc;
+                
+                const imgAfter = document.getElementById('lb-img-after');
+                imgAfter.src = 'images/' + src;
+                
+                document.getElementById('lb-after-wrapper').style.width = '50%';
+
+                // --- ИСПРАВЛЕНИЕ ---
+                // Мы принудительно ставим ширину картинки равной ширине контейнера.
+                // setTimeout нужен, чтобы браузер успел отрисовать модалку и посчитать ширину.
+                setTimeout(() => {
+                    imgAfter.style.width = compareBox.offsetWidth + 'px';
+                }, 50);
+
+            } else {
+                // Обычный режим (одна картинка)
+                document.getElementById('lightbox-compare-box').style.display = 'none';
+                const img = document.getElementById('lightbox-img');
+                img.style.display = 'block'; 
+                img.src = 'images/' + src;
+            }
+            
+            const playBtn = document.getElementById('lightbox-play-btn');
+            if(time > 0) { 
+                playBtn.style.display = 'flex'; 
+                playBtn.onclick = () => jumpToVideo(time); 
+            } else { 
+                playBtn.style.display = 'none'; 
+            }
+            
+            lightbox.style.display = 'flex'; 
+            setTimeout(() => lightbox.classList.add('active'), 10);
+        }
+
+        function closeLightbox() { lightbox.classList.remove('active'); setTimeout(() => { lightbox.style.display = 'none'; }, 300); }
+        function jumpToVideo(time) {
+            closeLightbox();
+            document.querySelector('.video-wrapper').scrollIntoView({behavior: 'smooth', block: 'center'});
+            pVideo.currentTime = time; pVideo.play(); pVideo.muted = false;
+            returnBtn.classList.add('active');
+        }
+        
+        // --- ИСПРАВЛЕННАЯ ФУНКЦИЯ ВОЗВРАТА С УЛУЧШЕННОЙ ПРОВЕРКОЙ ---
+        function returnToStep() {
+            pVideo.pause(); 
+            returnBtn.classList.remove('active');
+            if(activeStepId) { 
+                let el = document.getElementById(activeStepId);
+                // Если не нашли точный элемент (например фрейм), пробуем найти основной шаг
+                if (!el && activeStepId.includes('-f')) {
+                    el = document.getElementById(activeStepId.split('-f')[0]);
+                }
+                el?.scrollIntoView({behavior: 'smooth', block: 'center'}); 
+            }
+        }
+
+        // --- ЛОГИКА АДМИНКИ И СЧЕТЧИКА ---
+        const namespace = 'aleksej-portfolio-2026';
+        const adminModal = document.getElementById('admin-modal');
+        const adminLoginView = document.getElementById('admin-login-view');
+        const adminStatsView = document.getElementById('admin-stats-view');
+        const statsList = document.getElementById('stats-list-container');
+        const adminPassInput = document.getElementById('admin-pass');
+        
+        function toggleAdmin() {
+            if(adminModal.style.display === 'flex') {
+                adminModal.classList.remove('active'); setTimeout(() => { adminModal.style.display = 'none'; }, 300);
+            } else {
+                adminModal.style.display = 'flex'; setTimeout(() => { adminModal.classList.add('active'); }, 10);
+                adminLoginView.style.display = 'block';
+                adminStatsView.style.display = 'none';
+                adminPassInput.value = '';
+            }
+        }
+
+        // --- ПРОСТАЯ ПРОВЕРКА ПАРОЛЯ "108" ---
+        function checkAdminPassword() {
+            const input = adminPassInput.value.trim();
+            // Просто проверяем текст (надежно работает локально)
+            if (input === "108") {
+                adminLoginView.style.display = 'none';
+                adminStatsView.style.display = 'block';
+                loadAdminStats();
+            } else {
+                alert('ACCESS DENIED');
+                adminPassInput.value = '';
+            }
+        }
+
+        function loadAdminStats() {
+            statsList.innerHTML = '<div style="text-align:center; color:#888;">Fetching data...</div>';
+            let html = '';
+            const promises = [];
+
+            // Пробегаем по всем проектам
+            for (let key in projectsData) {
+                const projectTitle = projectsData[key].title['en']; // Берем название
+                // Делаем запрос (get, чтобы не накручивать)
+                const p = fetch(`https://api.countapi.xyz/get/${namespace}/${key}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        return { title: projectTitle, val: data.value || 0 };
+                    })
+                    .catch(() => { return { title: projectTitle, val: 0 }; });
+                promises.push(p);
+            }
+
+            Promise.all(promises).then(results => {
+                statsList.innerHTML = '';
+                results.forEach(item => {
+                    statsList.innerHTML += `
+                        <div class="stat-row">
+                            <span class="stat-name">${item.title}</span>
+                            <span class="stat-val">${item.val}</span>
+                        </div>
+                    `;
+                });
+            });
+        }
+
+        // Функция для накрутки при просмотре пользователем (ТЕПЕРЬ ТИХАЯ)
+        function updateViewCount(projectId) {
+            // Мы просто отправляем +1 на сервер, но ничего не показываем на экране
+            fetch(`https://api.countapi.xyz/hit/${namespace}/${projectId}`)
+                .then(response => response.json())
+                .catch(error => { console.log('View count error'); });
+        }
+
+        const canvas = document.getElementById('neural-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height; let particles = [];
+        // ИСПРАВЛЕНА ОШИБКА В ЦВЕТЕ (БЫЛА ЗАПЯТАЯ)
+        const properties = { particleColor: 'rgba(255, 255, 255, 0.5)', lineColor: 'rgba(0, 240, 255, 1)', particleCount: 70, connectionDistance: 150 };
+        function resize() { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize); resize();
+        class Particle {
+            constructor() { this.x = Math.random() * width; this.y = Math.random() * height; this.vx = (Math.random() - 0.5) * 0.5; this.vy = (Math.random() - 0.5) * 0.5; this.size = Math.random() * 2 + 1; }
+            update() { this.x += this.vx; this.y += this.vy; if (this.x < 0 || this.x > width) this.vx *= -1; if (this.y < 0 || this.y > height) this.vy *= -1; }
+            draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fillStyle = properties.particleColor; ctx.fill(); }
+        }
+        function init() { particles = []; for (let i = 0; i < properties.particleCount; i++) { particles.push(new Particle()); } }
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update(); particles[i].draw();
+                for (let j = i; j < particles.length; j++) {
+                    let dx = particles[i].x - particles[j].x; let dy = particles[i].y - particles[j].y; let distance = Math.sqrt(dx*dx + dy*dy);
+                    if (distance < properties.connectionDistance) {
+                        let opacity = 1 - (distance / properties.connectionDistance);
+                        ctx.strokeStyle = properties.lineColor + opacity + ')'; ctx.lineWidth = 1;
+                        ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y); ctx.stroke();
+                    }
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+        
+        init(); animate(); initCards(); initLightboxSlider(); initComparisons(); setLanguage('ru');
+    </script>
+</body>
+</html>
+}

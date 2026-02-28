@@ -1,0 +1,21 @@
+{ 
+    num: '01', 
+    title: {ru: 'Концепт', en: 'Concept'},
+    sub: {ru: 'Mixed Media', en: 'Mixed Media'}, 
+    desc: {ru: 'Описание...', en: 'Description...'}, 
+    
+    // НОВЫЙ ЕДИНЫЙ СПИСОК
+    media: [
+        // 1. Сначала картинка
+        { type: 'image', src: 'miro.png', time: 5 },
+        
+        // 2. Потом слайдер
+        { type: 'slider', before: 'sketch.jpg', after: 'final.jpg', time: 10 },
+        
+        // 3. Снова картинка
+        { type: 'image', src: 'miro2.png', time: 15 },
+
+        // 4. Еще один слайдер
+        { type: 'slider', before: 'wire.jpg', after: 'render.jpg', time: 20 }
+    ]
+},

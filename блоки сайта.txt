@@ -1,0 +1,111 @@
+Мы сделаем эффект "Нейронного Стазиса". Карточка покроется полупрозрачным цифровым щитом, по ней будет пробегать сканирующий лазер (как будто нейросеть пересобирает проект), и появится замок.
+
+Вот как это сделать:
+
+Шаг 1: Добавь этот CSS (в раздел <style>)
+Вставь этот код в самый низ своего CSS (перед закрывающим </style>).
+
+CSS
+        /* --- РЕЖИМ РЕКОНСТРУКЦИИ (NEURAL LOCK) --- */
+        .card.locked {
+            pointer-events: none; /* Отключаем клики */
+            user-select: none;
+            overflow: hidden;
+        }
+
+        /* Темная вуаль */
+        .locked-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 5, 7, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 50;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border: 1px solid rgba(0, 240, 255, 0.2);
+        }
+
+        /* Сканирующий луч (Нейронное воздействие) */
+        .neural-scan-line {
+            position: absolute; top: 0; left: 0; width: 100%; height: 5px;
+            background: linear-gradient(90deg, transparent, var(--accent-glow), transparent);
+            box-shadow: 0 0 15px var(--accent-glow);
+            opacity: 0.7;
+            animation: scanMove 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+
+        /* Глитч-текст */
+        .lock-status {
+            font-family: var(--font-tech); font-size: 14px; letter-spacing: 2px;
+            color: var(--accent-glow); text-transform: uppercase;
+            margin-top: 15px;
+            text-shadow: 0 0 5px var(--accent-glow);
+            animation: textPulse 2s ease-in-out infinite;
+        }
+
+        /* Иконка замка с пульсацией */
+        .lock-icon-svg {
+            width: 40px; height: 40px; fill: var(--text-muted);
+            animation: lockFloat 3s ease-in-out infinite;
+        }
+
+        @keyframes scanMove {
+            0% { top: -10%; opacity: 0; }
+            50% { opacity: 1; }
+            100% { top: 110%; opacity: 0; }
+        }
+        @keyframes lockFloat {
+            0%, 100% { transform: translateY(0); opacity: 0.5; }
+            50% { transform: translateY(-10px); opacity: 1; filter: drop-shadow(0 0 10px var(--accent-glow)); }
+        }
+        @keyframes textPulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; text-shadow: 0 0 15px var(--accent-glow); }
+        }
+Шаг 2: Измени HTML карточки (в <div class="grid">)
+Чтобы закрыть карточку, нужно сделать 2 вещи:
+
+Удалить (или стереть) атрибут onclick="...", чтобы она не открывалась.
+
+Добавить класс locked и блок .locked-overlay внутрь.
+
+Вот пример на карточке "Showreel 2026" (замени свою карточку на этот код):
+
+HTML
+                <div class="card col-6 locked">
+                    
+                    <div class="locked-overlay">
+                        <div class="neural-scan-line"></div>
+                        <svg class="lock-icon-svg" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                        <div class="lock-status">NEURAL TRAINING...</div>
+                    </div>
+                    <div style="width:100%; height:100%; position: absolute; background: linear-gradient(135deg, #1a1a2e, #16213e);"></div>
+                    <div class="card-content">
+                        <span class="card-tag">Portfolio</span>
+                        <h3 class="card-title">Showreel 2026</h3>
+                    </div>
+                </div>
+Что получится?
+Карточка останется на месте, но станет темной и размытой. Поверх неё будет медленно проходить светящаяся голубая полоса (сканирование), а посередине будет парить замок с надписью "NEURAL TRAINING..." (или напиши там "UPDATING" / "СКОРО").
+
+Нажать на неё будет нельзя. Выглядит очень технологично, как в играх, когда уровень еще не разблокирован!
+
+Всё верно! Чтобы «починить» карточку и вернуть её в рабочее состояние, тебе нужно просто заменить весь блок кода этой карточки на старый (оригинальный).
+
+Вот оригинальный код для карточки Showreel 2026 (без замка, с возможностью клика):
+
+HTML
+                <div class="card col-6" onclick="openProject('reel')">
+                    
+                    <div style="width:100%; height:100%; position: absolute; background: linear-gradient(135deg, #1a1a2e, #16213e);"></div>
+                    <div class="card-content">
+                        <span class="card-tag">Portfolio</span>
+                        <h3 class="card-title">Showreel 2026</h3>
+                    </div>
+                </div>
+Что именно нужно сделать:
+Найди в своём файле блок <div class="card col-6 locked"> ... </div> (тот, который ты менял).
+
+Удали его целиком.
+
+Вставь на его место код, который я дал выше.
+
+CSS удалять не обязательно. Стили .locked, .locked-overlay и анимации можно оставить в файле. Если ты не используешь класс locked в HTML, эти стили просто будут "спать" и никак не помешают работе сайта. Зато, если захочешь снова закрыть проект, они уже будут под рукой.
