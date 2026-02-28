@@ -4,8 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aleksej Berezhnoj | Motion Design</title>
-    <style>
 	
+	<meta property="og:type" content="website">
+<meta property="og:url" content="https://bergariusdesign.github.io/AlekseyBerezhnoy/">
+<meta property="og:title" content="Aleksej Berezhnoj | Digital Alchemy">
+<meta property="og:description" content="Motion Design & AI Cinematic Portfolio 2026. Исследуйте мир цифровой алхимии.">
+<meta property="og:image" content="https://bergariusdesign.github.io/AlekseyBerezhnoy/images/preview.jpg">
+
+<meta property="twitter:card" content="summary_large_image">
+<meta property="twitter:title" content="Aleksej Berezhnoj | Digital Alchemy">
+<meta property="twitter:description" content="Motion Design & AI Cinematic Portfolio 2026.">
+<meta property="twitter:image" content="https://bergariusdesign.github.io/AlekseyBerezhnoy/images/preview.jpg">
+	
+    <style>
+	html, body {
+    overflow-x: hidden;
+    position: relative;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+*, *:before, *:after {
+    box-sizing: inherit;
+}
 	#neural-percent {
     font-variant-numeric: tabular-nums; /* Чтобы цифры не "прыгали" при смене ширины */
     font-weight: 800;
