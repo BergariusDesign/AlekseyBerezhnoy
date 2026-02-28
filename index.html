@@ -26,6 +26,35 @@
     box-sizing: border-box;
 }
 
+/* Блокировка скролла страницы при открытом окне */
+body.modal-open {
+    overflow: hidden;
+    touch-action: none; /* Запрещает любые жесты браузера */
+}
+
+/* Улучшенный контейнер лайтбокса */
+.lightbox-content {
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Фикс слайдера в лайтбоксе */
+#lightbox-compare-box {
+    width: 100%;
+    max-width: 1200px;
+    height: auto;
+    aspect-ratio: 16/9; /* Сохраняем пропорции видео/фото */
+    max-height: 85vh; /* Чтобы кнопки не улетали за экран */
+    margin: auto;
+    touch-action: none; /* Важно: отключает системный свайп внутри слайдера */
+}
+
 *, *:before, *:after {
     box-sizing: inherit;
 }
@@ -1276,57 +1305,58 @@ Using NanaBanana, I synthesized complex materials, including multi-layered carbo
         }
 
         function initComparisons() {
-            const wrappers = document.querySelectorAll('.compare-card');
-            wrappers.forEach(card => {
-                const container = card.querySelector('.compare-container');
-                const afterWrapper = card.querySelector('.img-after-wrapper');
-                const afterImg = afterWrapper.querySelector('.compare-img');
-                
-                setTimeout(() => { afterImg.style.width = card.offsetWidth + 'px'; }, 100);
-                window.addEventListener('resize', () => { afterImg.style.width = card.offsetWidth + 'px'; });
+    const wrappers = document.querySelectorAll('.compare-card');
+    wrappers.forEach(card => {
+        const container = card.querySelector('.compare-container');
+        const afterWrapper = card.querySelector('.img-after-wrapper');
+        const afterImg = afterWrapper.querySelector('.compare-img');
+        
+        // Фикс ширины
+        const updateWidth = () => { afterImg.style.width = container.offsetWidth + 'px'; };
+        setTimeout(updateWidth, 100);
 
-                card.addEventListener('mousemove', (e) => {
-                    const rect = container.getBoundingClientRect();
-                    let x = e.clientX - rect.left;
-                    if (x < 0) x = 0; if (x > rect.width) x = rect.width;
-                    afterWrapper.style.width = x + 'px';
-                });
-                card.addEventListener('touchmove', (e) => {
-                    const rect = container.getBoundingClientRect();
-                    let x = e.touches[0].clientX - rect.left;
-                    if (x < 0) x = 0; if (x > rect.width) x = rect.width;
-                    afterWrapper.style.width = x + 'px';
-                });
-            });
-        }
+        const move = (e) => {
+            if (e.type === 'touchmove') e.preventDefault(); // ОСТАНАВЛИВАЕМ СКРОЛЛ БРАУЗЕРА
+            const rect = container.getBoundingClientRect();
+            let x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+            if (x < 0) x = 0; if (x > rect.width) x = rect.width;
+            afterWrapper.style.width = x + 'px';
+        };
 
-        function initLightboxSlider() {
-            const container = document.getElementById('lightbox-compare-box');
-            const afterWrapper = document.getElementById('lb-after-wrapper');
-            const afterImg = document.getElementById('lb-img-after');
+        card.addEventListener('mousemove', move);
+        card.addEventListener('touchmove', move, {passive: false}); // passive: false позволяет preventDefault
+    });
+}
 
-            window.addEventListener('resize', () => {
-                if(container.style.display === 'block') {
-                    afterImg.style.width = container.offsetWidth + 'px';
-                }
-            });
+function initLightboxSlider() {
+    const container = document.getElementById('lightbox-compare-box');
+    const afterWrapper = document.getElementById('lb-after-wrapper');
+    const afterImg = document.getElementById('lb-img-after');
 
-            container.addEventListener('mousemove', (e) => {
-                const rect = container.getBoundingClientRect();
-                let x = e.clientX - rect.left;
-                if (x < 0) x = 0; if (x > rect.width) x = rect.width;
-                afterWrapper.style.width = x + 'px';
-            });
-            container.addEventListener('touchmove', (e) => {
-                const rect = container.getBoundingClientRect();
-                let x = e.touches[0].clientX - rect.left;
-                if (x < 0) x = 0; if (x > rect.width) x = rect.width;
-                afterWrapper.style.width = x + 'px';
-            });
-        }
+    const move = (e) => {
+        if (e.cancelable) e.preventDefault(); // ГЛАВНЫЙ ФИКС ОТ ПЛАВАНИЯ
+        const rect = container.getBoundingClientRect();
+        let x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+        if (x < 0) x = 0; if (x > rect.width) x = rect.width;
+        afterWrapper.style.width = x + 'px';
+    };
+
+    container.addEventListener('mousemove', move);
+    container.addEventListener('touchmove', move, {passive: false});
+}
+
+window.addEventListener('resize', () => {
+    // Принудительно обновляем ширину внутреннего фото в слайдере лайтбокса
+    const compareBox = document.getElementById('lightbox-compare-box');
+    const imgAfter = document.getElementById('lb-img-after');
+    if (compareBox && imgAfter) {
+        imgAfter.style.width = compareBox.offsetWidth + 'px';
+    }
+});
 
           function openLightbox(src, time = 0, stepId = '', beforeSrc = '') {
-            activeStepId = stepId;
+    activeStepId = stepId;
+    document.body.classList.add('modal-open');
             
             if (beforeSrc) {
                 // Режим сравнения (слайдер)
@@ -1346,8 +1376,9 @@ Using NanaBanana, I synthesized complex materials, including multi-layered carbo
                 // Мы принудительно ставим ширину картинки равной ширине контейнера.
                 // setTimeout нужен, чтобы браузер успел отрисовать модалку и посчитать ширину.
                 setTimeout(() => {
-                    imgAfter.style.width = compareBox.offsetWidth + 'px';
-                }, 50);
+            const compareBox = document.getElementById('lightbox-compare-box');
+            document.getElementById('lb-img-after').style.width = compareBox.offsetWidth + 'px';
+        }, 100);
 
             } else {
                 // Обычный режим (одна картинка)
@@ -1369,7 +1400,11 @@ Using NanaBanana, I synthesized complex materials, including multi-layered carbo
             setTimeout(() => lightbox.classList.add('active'), 10);
         }
 
-        function closeLightbox() { lightbox.classList.remove('active'); setTimeout(() => { lightbox.style.display = 'none'; }, 300); }
+       function closeLightbox() {
+    document.body.classList.remove('modal-open'); // РАЗМОРАЖИВАЕМ САЙТ
+    lightbox.classList.remove('active');
+    setTimeout(() => { lightbox.style.display = 'none'; }, 300);
+}
         function jumpToVideo(time) {
             closeLightbox();
             document.querySelector('.video-wrapper').scrollIntoView({behavior: 'smooth', block: 'center'});
