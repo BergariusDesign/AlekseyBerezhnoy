@@ -1486,12 +1486,12 @@ function closeLightbox() {
 
             for (let key in projectsData) {
                 const projectTitle = projectsData[key].title['en']; 
-                // Запрос к новому сервису
-                const p = fetch(`https://api.counterapi.dev/v1/projects/${namespace}/counters/${key}`)
+                // ✅ ИСПРАВЛЕННАЯ ССЫЛКА (убрали projects/ и counters/)
+                const p = fetch(`https://api.counterapi.dev/v1/${namespace}/${key}`)
                     .then(res => res.json())
                     .then(data => {
-                        // В новом сервисе число лежит в data.count, а не в data.value
-                        return { title: projectTitle, val: data.count || 0 };
+                        // Берем data.value, так как CounterAPI возвращает значение в value
+                        return { title: projectTitle, val: data.value || data.count || 0 };
                     })
                     .catch(() => { return { title: projectTitle, val: 0 }; });
                 promises.push(p);
@@ -1510,13 +1510,14 @@ function closeLightbox() {
             });
         }
 
-        // Функция для накрутки при просмотре пользователем (ТЕПЕРЬ ТИХАЯ)
+        // Функция для накрутки при просмотре пользователем
         function updateViewCount(projectId) {
-            // Эндпоинт /up создаст счетчик автоматически при первом клике
-            fetch(`https://api.counterapi.dev/v1/projects/${namespace}/counters/${projectId}/up`)
+            const antiCache = Math.random();
+            // ✅ ИСПРАВЛЕННАЯ ССЫЛКА (убрали projects/ и counters/)
+            fetch(`https://api.counterapi.dev/v1/${namespace}/${projectId}/up?t=${antiCache}`)
                 .then(res => res.json())
-                .then(data => console.log('Просмотр засчитан:', data.count))
-                .catch(err => console.log('Счетчик инициализируется...'));
+                .then(data => console.log(`Просмотр ${projectId} засчитан. Всего: ${data.value || data.count}`))
+                .catch(err => console.log('Счетчик заблокирован браузером...'));
         }
 
         const canvas = document.getElementById('neural-canvas');
