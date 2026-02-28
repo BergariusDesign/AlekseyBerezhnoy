@@ -1467,7 +1467,7 @@ function closeLightbox() {
         }
 
         async function checkAdminPassword() {
-            const input = adminPassInput.value.trim(); // ДОБАВИЛИ TRIM ДЛЯ ПРЕДОТВРАЩЕНИЯ ОШИБОК С ПРОБЕЛАМИ
+            const input = adminPassInput.value.trim();
             const msgBuffer = new TextEncoder().encode(input);
             const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
             const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -1489,11 +1489,11 @@ function closeLightbox() {
 
             for (let key in projectsData) {
                 const projectTitle = projectsData[key].title['en']; 
-                // ✅ ИЗМЕНИЛИ v1 НА v2 И ДОБАВИЛИ КЛЮЧ
                 const p = fetch(`https://api.counterapi.dev/v2/${namespace}/${key}`, {
                     method: 'GET',
                     headers: {
-                        'Authorization': `Bearer ${API_KEY}`
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'Content-Type': 'application/json' // ✅ ДОБАВЛЕНО СЮДА
                     }
                 })
                     .then(res => res.json())
@@ -1518,13 +1518,13 @@ function closeLightbox() {
         }
 
         // Функция для накрутки при просмотре пользователем
-        function updateViewCount(projectId) {
+        ffunction updateViewCount(projectId) {
             const antiCache = Math.random();
-            // ✅ ИЗМЕНИЛИ v1 НА v2 И ДОБАВИЛИ КЛЮЧ
             fetch(`https://api.counterapi.dev/v2/${namespace}/${projectId}/up?t=${antiCache}`, {
-                method: 'GET', // В v2 лучше явно указывать метод
+                method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${API_KEY}`
+                    'Authorization': `Bearer ${API_KEY}`,
+                    'Content-Type': 'application/json' // ✅ ДОБАВЛЕНО И СЮДА
                 }
             })
                 .then(res => res.json())
