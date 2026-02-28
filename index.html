@@ -1513,6 +1513,10 @@ function closeLightbox() {
                             <span class="stat-val">${item.val}</span>
                         </div>
                     `;
+                }); // <-- ВОТ ЭТИ СКОБКИ БЫЛИ СЛУЧАЙНО УДАЛЕНЫ
+            });     // <-- И ЭТИ
+        }           // <-- И ЭТА
+		
             // Функция для тихой накрутки просмотров (обход ошибки CORS)
         function updateViewCount(projectId) {
             // Используем v1 и режим no-cors. Сервер получит +1, а браузер не будет ругаться.
