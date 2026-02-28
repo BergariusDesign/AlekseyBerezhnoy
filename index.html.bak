@@ -314,7 +314,7 @@ body.modal-open {
             top: 0;
             left: 0;
             height: 100% !important;
-            width: auto; /* Убрали 100% !important */
+            width: 100%; /* Убрали 100% !important */
             object-fit: contain !important; 
             pointer-events: none;
             display: block;
@@ -324,13 +324,13 @@ body.modal-open {
             top: 0;
             left: 0;
             height: 100%;
-            width: 50%;
+            width: 100%;
             overflow: hidden;
             border-right: 2px solid var(--accent-glow);
             z-index: 2;
         }
         .img-after-wrapper .compare-img { 
-            width: auto; 
+            width: 100%; 
             max-width: none !important; /* Критично: запрещает картинке сжиматься вместе с оберткой */
         }
         .label {
@@ -1391,10 +1391,9 @@ window.addEventListener('resize', () => {
                 lbImgBefore.src = 'images/' + beforeSrc;
                 lbImgAfter.src = 'images/' + src;
 
-                // ФИКС: Жестко блокируем ширину картинок в пикселях, 
-                // чтобы "After" не масштабировалась при движении ползунка
+                // ФИКС: Устанавливаем точную ширину в пикселях
                 const syncSizes = () => {
-                    const boxWidth = compareBox.clientWidth; // Берем чистую ширину контейнера
+                    const boxWidth = compareBox.offsetWidth;
                     if (boxWidth > 0) {
                         lbImgBefore.style.width = boxWidth + 'px';
                         lbImgAfter.style.width = boxWidth + 'px';
@@ -1402,9 +1401,8 @@ window.addEventListener('resize', () => {
                     }
                 };
                 
-                // Запускаем сразу и через микро-паузу для надежности
-                syncSizes();
-                setTimeout(syncSizes, 100);
+                // Запускаем через паузу, чтобы браузер успел отрисовать модалку
+                setTimeout(syncSizes, 150);
 
             } else {
                 compareBox.style.display = 'none';
