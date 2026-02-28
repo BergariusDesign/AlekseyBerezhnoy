@@ -314,7 +314,7 @@ body.modal-open {
     top: 0;
     left: 0;
     height: 100% !important;
-    object-fit: contain !important; /* Чтобы вертикальное видео не растягивалось */
+    object-fit: cover !important; /* Чтобы вертикальное видео не растягивалось */
     pointer-events: none;
     display: block;
 }
@@ -328,7 +328,7 @@ body.modal-open {
     border-right: 2px solid var(--accent-glow);
     z-index: 2;
 }
-        .img-after-wrapper .compare-img { width: 100vw; max-width: none; }
+        .img-after-wrapper .compare-img { width: 100% !important; height: 100%; object-fit: cover !important; }
         .label {
             position: absolute; top: 20px; font-family: var(--font-tech); font-size: 10px; padding: 4px 8px;
             background: rgba(0,0,0,0.6); border: 1px solid var(--glass-border); border-radius: 4px; color: #fff; pointer-events: none; z-index: 10;
@@ -554,7 +554,7 @@ body.modal-open {
             display: block;
             width: auto; 
             height: 100% !important;
-            object-fit: contain !important;
+            object-fit: cover !important;
             pointer-events: none;
         }
         
@@ -1509,10 +1509,10 @@ function closeLightbox() {
 
         // Функция для накрутки при просмотре пользователем (ТЕПЕРЬ ТИХАЯ)
         function updateViewCount(projectId) {
-            // Мы просто отправляем +1 на сервер, но ничего не показываем на экране
-            fetch(`https://api.countapi.xyz/hit/${namespace}/${projectId}`)
+            // Запрос на увеличение счетчика (добавляем /up в конце ссылки)
+            fetch(`https://api.counterapi.dev/v1/projects/${namespace}/counters/${projectId}/up`)
                 .then(response => response.json())
-                .catch(error => { console.log('View count error'); });
+                .catch(error => { console.log('Counter error'); });
         }
 
         const canvas = document.getElementById('neural-canvas');
