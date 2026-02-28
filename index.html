@@ -1510,7 +1510,7 @@ function closeLightbox() {
         }
 
         // Функция для накрутки при просмотре пользователем (ТЕПЕРЬ ТИХАЯ)
-        ffunction updateViewCount(projectId) {
+        function updateViewCount(projectId) {
             // Эндпоинт /up создаст счетчик автоматически при первом клике
             fetch(`https://api.counterapi.dev/v1/projects/${namespace}/counters/${projectId}/up`)
                 .then(res => res.json())
