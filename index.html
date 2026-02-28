@@ -1726,6 +1726,14 @@ document.getElementById('lightbox-compare-box').addEventListener('touchmove', fu
     if (e.cancelable) e.preventDefault(); 
 }, { passive: false });
 
+// Установка громкости для видео в футере на 50%
+document.addEventListener('DOMContentLoaded', () => {
+    const showreelVideo = document.querySelector('.showreel-video');
+    if (showreelVideo) {
+        showreelVideo.volume = 0.3; // Значение от 0.0 до 1.0
+    }
+});
+
     </script>
 </body>
 </html>
