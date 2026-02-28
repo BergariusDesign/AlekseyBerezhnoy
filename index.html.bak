@@ -1625,6 +1625,33 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+window.addEventListener('resize', () => {
+    const compareBox = document.getElementById('lightbox-compare-box');
+    if (compareBox && compareBox.style.display === 'block') {
+        const imgBefore = document.getElementById('lb-img-before');
+        const imgAfter = document.getElementById('lb-img-after');
+        const afterWrapper = document.getElementById('lb-after-wrapper');
+
+        // Функция пересчета
+        const fixSizes = () => {
+            const newWidth = compareBox.offsetWidth;
+            imgBefore.style.width = newWidth + 'px';
+            imgAfter.style.width = newWidth + 'px';
+            // Возвращаем ползунок в центр, чтобы не "улетал"
+            afterWrapper.style.width = '50%';
+        };
+
+        fixSizes();
+        // Повторяем через 200мс, так как iPhone меняет размер с анимацией
+        setTimeout(fixSizes, 200);
+    }
+});
+
+// Фикс для корректной работы тач-слайдера без плавания страницы
+document.getElementById('lightbox-compare-box').addEventListener('touchmove', function(e) {
+    if (e.cancelable) e.preventDefault(); 
+}, { passive: false });
+
     </script>
 </body>
 </html>
