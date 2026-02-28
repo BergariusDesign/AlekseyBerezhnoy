@@ -1518,7 +1518,7 @@ function closeLightbox() {
         }
 
         // Функция для накрутки при просмотре пользователем
-        ffunction updateViewCount(projectId) {
+        function updateViewCount(projectId) {
             const antiCache = Math.random();
             fetch(`https://api.counterapi.dev/v2/${namespace}/${projectId}/up?t=${antiCache}`, {
                 method: 'GET',
