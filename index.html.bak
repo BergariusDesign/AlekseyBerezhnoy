@@ -1730,20 +1730,14 @@ document.getElementById('lightbox-compare-box').addEventListener('touchmove', fu
 
 // Установка громкости для видео в футере на 50%
 document.addEventListener('DOMContentLoaded', () => {
-    const showreelVideo = document.querySelector('.showreel-video');
-    if (showreelVideo) {
-        showreelVideo.volume = 0.3; // Значение от 0.0 до 1.0
-    }
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-    const mainShowreel = document.querySelector('.showreel-video');
-    if (mainShowreel) {
-        mainShowreel.addEventListener('play', () => {
-            updateViewCount('showreel');
-        });
-    }
-});
+        const mainShowreel = document.querySelector('.showreel-video');
+        if (mainShowreel) {
+            mainShowreel.volume = 0.3; // Громкость 50%
+            mainShowreel.addEventListener('play', () => {
+                updateViewCount('showreel');
+            }, { once: true });
+        }
+    });
 
     </script>
 </body>
