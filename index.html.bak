@@ -1740,12 +1740,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-const mainShowreel = document.querySelector('.showreel-video');
-if (mainShowreel) {
-    mainShowreel.addEventListener('play', () => {
-        updateViewCount('showreel');
-    }, { once: true }); // Сработает один раз за сессию, чтобы не накручивать
-}
+document.addEventListener('DOMContentLoaded', () => {
+    const mainShowreel = document.querySelector('.showreel-video');
+    if (mainShowreel) {
+        mainShowreel.addEventListener('play', () => {
+            updateViewCount('showreel');
+        });
+    }
+});
 
     </script>
 </body>
