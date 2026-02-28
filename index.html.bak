@@ -28,31 +28,34 @@
 
 /* Блокировка скролла страницы при открытом окне */
 body.modal-open {
-    overflow: hidden;
-    touch-action: none; /* Запрещает любые жесты браузера */
+   overflow: hidden !important;
+    height: 100vh;
+    width: 100vw;
+    position: fixed;
 }
 
 /* Улучшенный контейнер лайтбокса */
 .lightbox-content {
     width: 100%;
     height: 100%;
-    padding: 20px;
-    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    padding: 10px;
+    box-sizing: border-box;
 }
 
 /* Фикс слайдера в лайтбоксе */
 #lightbox-compare-box {
     width: 100%;
-    max-width: 1200px;
-    height: auto;
-    aspect-ratio: 16/9; /* Сохраняем пропорции видео/фото */
-    max-height: 85vh; /* Чтобы кнопки не улетали за экран */
+    max-width: 100%;
+    aspect-ratio: 16/9; /* Сохраняем пропорции */
+    max-height: 80vh;   /* В портрете */
     margin: auto;
-    touch-action: none; /* Важно: отключает системный свайп внутри слайдера */
+    position: relative;
+    overflow: hidden;
+    touch-action: none;
 }
 
 *, *:before, *:after {
@@ -530,15 +533,24 @@ body.modal-open {
     .step-number { font-size: 40px; position: static; margin-bottom: 10px; color: var(--accent-glow); opacity: 0.5; }
 
     /* 5. ЛАЙТБОКС (Картинки на весь экран) */
-    .lightbox-img { 
-        max-width: 100vw !important; 
-        max-height: 80vh !important; 
-        width: 100% !important;
-        object-fit: contain; 
-        border: none !important;
+    .lightbox-img {
+        max-height: 75vh !important;
     }
+	
+	.compare-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Картинка всегда внутри рамки, без обрезки */
+    pointer-events: none;
+}
+	
+}
     
-    #lightbox-compare-box { width: 100vw; height: 50vh; }
+    #lightbox-compare-box {
+        max-height: 70vh; /* Ограничиваем высоту, чтобы всё влезло */
+        width: auto;      /* Позволяем сузиться, чтобы не было зума */
+    }
     .modal-close { top: 10px; right: 15px; font-size: 40px; }
 
     /* 6. Футер и иконки */
@@ -1356,51 +1368,50 @@ window.addEventListener('resize', () => {
 
           function openLightbox(src, time = 0, stepId = '', beforeSrc = '') {
     activeStepId = stepId;
+    // Блокируем скролл основной страницы
     document.body.classList.add('modal-open');
-            
-            if (beforeSrc) {
-                // Режим сравнения (слайдер)
-                document.getElementById('lightbox-img').style.display = 'none';
-                
-                const compareBox = document.getElementById('lightbox-compare-box');
-                compareBox.style.display = 'block';
-                
-                document.getElementById('lb-img-before').src = 'images/' + beforeSrc;
-                
-                const imgAfter = document.getElementById('lb-img-after');
-                imgAfter.src = 'images/' + src;
-                
-                document.getElementById('lb-after-wrapper').style.width = '50%';
+    
+    const compareBox = document.getElementById('lightbox-compare-box');
+    const imgNormal = document.getElementById('lightbox-img');
 
-                // --- ИСПРАВЛЕНИЕ ---
-                // Мы принудительно ставим ширину картинки равной ширине контейнера.
-                // setTimeout нужен, чтобы браузер успел отрисовать модалку и посчитать ширину.
-                setTimeout(() => {
-                    imgAfter.style.width = compareBox.offsetWidth + 'px';
-                }, 50);
+    if (beforeSrc) {
+        imgNormal.style.display = 'none';
+        compareBox.style.display = 'block';
+        
+        const imgBefore = document.getElementById('lb-img-before');
+        const imgAfter = document.getElementById('lb-img-after');
+        
+        imgBefore.src = 'images/' + beforeSrc;
+        imgAfter.src = 'images/' + src;
 
-            } else {
-                // Обычный режим (одна картинка)
-                document.getElementById('lightbox-compare-box').style.display = 'none';
-                const img = document.getElementById('lightbox-img');
-                img.style.display = 'block'; 
-                img.src = 'images/' + src;
-            }
-            
-            const playBtn = document.getElementById('lightbox-play-btn');
-            if(time > 0) { 
-                playBtn.style.display = 'flex'; 
-                playBtn.onclick = () => jumpToVideo(time); 
-            } else { 
-                playBtn.style.display = 'none'; 
-            }
-            
-            lightbox.style.display = 'flex'; 
-            setTimeout(() => lightbox.classList.add('active'), 10);
-        }
+        // Даем браузеру 100мс отрисовать контейнер и подгоняем размеры картинок
+        setTimeout(() => {
+            const currentWidth = compareBox.offsetWidth;
+            imgBefore.style.width = currentWidth + 'px';
+            imgAfter.style.width = currentWidth + 'px';
+        }, 100);
 
-       function closeLightbox() {
-    document.body.classList.remove('modal-open'); // РАЗМОРАЖИВАЕМ САЙТ
+    } else {
+        compareBox.style.display = 'none';
+        imgNormal.style.display = 'block'; 
+        imgNormal.src = 'images/' + src;
+    }
+    
+    const playBtn = document.getElementById('lightbox-play-btn');
+    if(time > 0) { 
+        playBtn.style.display = 'flex'; 
+        playBtn.onclick = () => jumpToVideo(time); 
+    } else { 
+        playBtn.style.display = 'none'; 
+    }
+    
+    lightbox.style.display = 'flex'; 
+    setTimeout(() => lightbox.classList.add('active'), 10);
+}
+
+function closeLightbox() {
+    // Разблокируем скролл
+    document.body.classList.remove('modal-open');
     lightbox.classList.remove('active');
     setTimeout(() => { lightbox.style.display = 'none'; }, 300);
 }
