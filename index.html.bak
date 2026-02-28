@@ -927,7 +927,7 @@ Using NanaBanana, I synthesized complex materials, including multi-layered carbo
                                 fit: 'contain', // Чтобы открытка влезла целиком
                                 ratio: '9/16',  // Вертикальная пропорция
                                 width: '40%'    // Ограничение ширины для красоты
-                            }
+                            },
                         ]
                     },
                     { 
