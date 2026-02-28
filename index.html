@@ -1513,22 +1513,13 @@ function closeLightbox() {
                             <span class="stat-val">${item.val}</span>
                         </div>
                     `;
-                });
-            });
-        }
-
-        // НАКРУТКА ПРОСМОТРОВ (Метод POST)
+            // Функция для тихой накрутки просмотров (обход ошибки CORS)
         function updateViewCount(projectId) {
-            // Запрос с /up для увеличения
-            fetch(`https://api.counterapi.dev/v2/${namespace}/${projectId}/up`, {
-                method: 'POST', // Строго POST, как сказала поддержка
-                headers: {
-                    'Authorization': `Bearer ${API_KEY}`
-                }
-            })
-                .then(res => res.json())
-                .then(data => console.log(`Просмотр ${projectId} засчитан. Всего: ${data.count}`))
-                .catch(err => console.log('Счетчик пока недоступен.'));
+            // Используем v1 и режим no-cors. Сервер получит +1, а браузер не будет ругаться.
+            fetch(`https://api.counterapi.dev/v1/${namespace}/${projectId}/up`, {
+                method: 'GET',
+                mode: 'no-cors' 
+            }).catch(() => {});
         }
 
         const canvas = document.getElementById('neural-canvas');

@@ -1443,7 +1443,6 @@ function closeLightbox() {
 
         // --- ЛОГИКА АДМИНКИ И СЧЕТЧИКА ---
         const namespace = 'aleksey-portfolio';
-        // 👇 НЕ ЗАБУДЬ ВСТАВИТЬ СВОЙ КЛЮЧ 👇
         const API_KEY = 'ut_q4PvvnKoqZH0RgjnlAGOZGNc0MqLfeGr78sk8WZs'; 
 
         const adminModal = document.getElementById('admin-modal');
@@ -1483,17 +1482,18 @@ function closeLightbox() {
             }
         }
 
+        // ПОЛУЧЕНИЕ СТАТИСТИКИ (Метод GET)
         function loadAdminStats() {
             statsList.innerHTML = '<div style="text-align:center; color:#888;">Fetching data...</div>';
             const promises = [];
 
             for (let key in projectsData) {
                 const projectTitle = projectsData[key].title['en']; 
+                // Запрос без /up, так как мы только читаем
                 const p = fetch(`https://api.counterapi.dev/v2/${namespace}/${key}`, {
-                    method: 'GET',
+                    method: 'GET', // Строго GET
                     headers: {
-                        'Authorization': `Bearer ${API_KEY}`,
-                        'Content-Type': 'application/json' // ✅ ДОБАВЛЕНО СЮДА
+                        'Authorization': `Bearer ${API_KEY}`
                     }
                 })
                     .then(res => res.json())
@@ -1517,19 +1517,17 @@ function closeLightbox() {
             });
         }
 
-        // Функция для накрутки при просмотре пользователем
+        // Функция для тихой накрутки просмотров (обход ошибки CORS)
         function updateViewCount(projectId) {
-            const antiCache = Math.random();
-            fetch(`https://api.counterapi.dev/v2/${namespace}/${projectId}/up?t=${antiCache}`, {
+            // Используем v1 и режим no-cors. Сервер получит +1, а браузер не будет ругаться.
+            fetch(`https://api.counterapi.dev/v1/${namespace}/${projectId}/up`, {
                 method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${API_KEY}`,
-                    'Content-Type': 'application/json' // ✅ ДОБАВЛЕНО И СЮДА
-                }
-            })
+                mode: 'no-cors' 
+            }).catch(() => {});
+        }
                 .then(res => res.json())
                 .then(data => console.log(`Просмотр ${projectId} засчитан. Всего: ${data.count}`))
-                .catch(err => console.log('Счетчик заблокирован:', err));
+                .catch(err => console.log('Счетчик пока недоступен.'));
         }
 
         const canvas = document.getElementById('neural-canvas');
