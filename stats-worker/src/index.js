@@ -19,7 +19,9 @@ const ALLOWED_ORIGINS = [
 ];
 
 // VIDEO_IDS СЃРёРЅС…СЂРѕРЅРёР·РёСЂРѕРІР°РЅ СЃ projectsData РІ index.html
-const VIDEO_IDS = ['magic', 'showreel', 'woman', 'watch'];
+/* VIDEO_IDS синхронизированы с frontend (stats.js: SRC_VIDEO_MAP).
+   Frontend шлёт 'M1'..'M4' — Worker нормализует в lowercase (m1..m4). */
+const VIDEO_IDS = ['magic', 'showreel', 'woman', 'watch', 'm1', 'm2', 'm3', 'm4'];
 
 // === СЃРµСЃСЃРёРё ===
 // РљРѕСЂРѕС‚РєРѕР¶РёРІСѓС‰РёРµ С‚РѕРєРµРЅС‹, С…СЂР°РЅСЏС‚СЃСЏ РІ РїР°РјСЏС‚Рё Worker (РєР°Р¶РґС‹Р№ isolate).
@@ -265,7 +267,11 @@ export default {
                 const token = createSession();
                 const cookie =
                     'admin_session=' + token +
-                    '; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=' +
+                    /* SameSite=None (requires Secure) — MANDATORY for cross-site:
+                       frontend github.io -> API workers.dev are different sites,
+                       Strict/Lax cookie is rejected in third-party context and
+                       never sent back on cross-site requests (stats got 401). */
+                    '; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=' +
                     (SESSION_TTL_MS / 1000);
 
                 return json({ ok: true }, 200, {
@@ -281,7 +287,7 @@ export default {
                 }
                 deleteSession(request);
                 const cookie =
-                    'admin_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0';
+                    'admin_session=; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=0';
                 return json({ ok: true }, 200, {
                     ...cors,
                     'Set-Cookie': cookie

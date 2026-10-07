@@ -24,4 +24,8 @@ INSERT OR IGNORE INTO videos (id, name) VALUES
     ('magic',    'The Only Wall is You'),
     ('showreel', 'Commercial Motion (Mobile)'),
     ('woman',    'Commercial Motion (AI & VFX)'),
-    ('watch',    'Luxury Watch');
+    ('watch',    'Luxury Watch'),
+    ('m1',       'M1 (Little World)'),
+    ('m2',       'M2 (Little World)'),
+    ('m3',       'M3 (Little World)'),
+    ('m4',       'M4 (Little World)');

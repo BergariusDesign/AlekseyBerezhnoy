@@ -85,6 +85,69 @@
     }
 
     /* ============================================================
+       ПРЯМАЯ ПРИВЯЗКА ТРЕКИНГА К РЕАЛЬНЫМ <video> (src -> videoId).
+
+       Обфусцированный main-скрипт вызывает updateViewCount через
+       замыкание (локальную функцию, шлющую в мёртвый counterapi.dev),
+       поэтому перехват window.updateViewCount не срабатывал и
+       POST /api/view вообще не отправлялся. Теперь трекинг вешается
+       напрямую на DOM: видео с известным src получает счётчик при
+       первом play. Событие play не всплывает — слушаем document
+       в capture-фазе: это ловит и ДИНАМИЧЕСКИ созданные видео
+       Second World (M1..M4 создаются в video-network.js при init).
+       Существующая логика порога (3с / 25% с клампом 3..30с) и
+       дедупликация (Set counted, раз на page session) не меняются.
+       ============================================================ */
+
+    var SRC_VIDEO_MAP = {
+        'qw.mp4':        'magic',     /* главная: карточка + проект magic */
+        'showreel.mp4':  'showreel',  /* главная: блок Show Reel */
+        'm1.mp4':        'M1',        /* Second World */
+        'm2.mp4':        'M2',
+        'm3.mp4':        'M3',
+        'm4.mp4':        'M4',
+        'promo.mp4':     'woman',     /* исторические ID — сохранены */
+        'watch.mp4':     'watch'
+    };
+
+    function videoIdOfSrc(videoEl) {
+        var src = videoEl.currentSrc || '';
+        if (!src) {
+            var s = videoEl.querySelector('source');
+            if (s) src = s.getAttribute('src') || s.src || '';
+        }
+        if (!src) src = videoEl.getAttribute('src') || videoEl.src || '';
+        src = String(src).toLowerCase();
+        var file = src.split('/').pop().split('?')[0];
+        return SRC_VIDEO_MAP[file] || null;
+    }
+
+    // делегированный capture-listener: play у любого video (в т.ч.
+    // динамических) -> привязать трекинг, если src известен
+    document.addEventListener('play', function (e) {
+        var el = e.target;
+        if (!el || el.tagName !== 'VIDEO') return;
+        var id = videoIdOfSrc(el);
+        if (id) attachViewTracking(el, id);
+    }, true);
+
+    // страховка: видео, которые уже играют до установки listener
+    // (автозапуск карточек). DOMContentLoaded отрабатывает ПОСЛЕ
+    // init ai-world/video-network (их слушатель зарегистрирован
+    // раньше), поэтому vn-video M1..M4 уже существуют в DOM.
+    function scanExistingVideos() {
+        document.querySelectorAll('video').forEach(function (el) {
+            var id = videoIdOfSrc(el);
+            if (id) attachViewTracking(el, id);
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', scanExistingVideos);
+    } else {
+        scanExistingVideos();
+    }
+
+    /* ============================================================
        ПЕРЕХВАТ updateViewCount — старые вызовы из обфусцированного кода
        (openProject / showreel play) перенаправляются в новую систему
        с грамотным критерием просмотра.
