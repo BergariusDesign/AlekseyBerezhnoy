@@ -1,0 +1,1603 @@
+﻿/* ============================================================
+   AI WORLD вЂ” РёР·РѕР»РёСЂРѕРІР°РЅРЅС‹Р№ РјРѕРґСѓР»СЊ РїРµСЂРµС…РѕРґР° Рё РёРЅС‚РµСЂР°РєС‚РёРІР°.
+   РўРѕС‡РєРё СЂР°СЃС€РёСЂРµРЅРёСЏ: AIWPortal.effect (РґР»СЏ WebGL distortion).
+   ============================================================ */
+
+(function () {
+    'use strict';
+
+    /* ---------- СѓС‚РёР»РёС‚С‹ ---------- */
+
+    const $ = (sel, root) => (root || document).querySelector(sel);
+    const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+
+    const prefersReducedMotion = () =>
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
+
+    const gsapOK = () => typeof window.gsap !== 'undefined';
+
+    /* ---------- С‚РѕС‡РєР° СЂР°СЃС€РёСЂРµРЅРёСЏ WebGL ----------
+       РџРѕР·Р¶Рµ: AIWPortal.effect = { absorb(el, opts), collapse(), bloom() }
+       РџРѕРєР° вЂ” null, РїРµСЂРµС…РѕРґ СЃС‚СЂРѕРёС‚СЃСЏ РЅР° GSAP. */
+    const WebGLHook = null;
+
+    /* ============================================================
+       РџРћР РўРђР› вЂ” РіСЂР°РІРёС‚Р°С†РёРѕРЅРЅР°СЏ РІРѕСЂРѕРЅРєР°
+       ============================================================ */
+
+    const AIWPortal = {
+        transition: null,   // РѕРІРµСЂР»РµР№ white transition
+        burst: null,
+        veil: null,
+        singularity: null,  // РІРёР·СѓР°Р»СЊРЅС‹Р№ РєРѕР»Р»Р°РїСЃ РІ С†РµРЅС‚СЂРµ СЌРєСЂР°РЅР°
+
+        init() {
+            this.transition = document.createElement('div');
+            this.transition.className = 'aiw-transition';
+            this.transition.innerHTML =
+                '<div class="aiw-transition-veil"></div>' +
+                '<div class="aiw-transition-burst"></div>';
+            document.body.appendChild(this.transition);
+            this.burst = $('.aiw-transition-burst', this.transition);
+            this.veil = $('.aiw-transition-veil', this.transition);
+
+            this.singularity = document.createElement('div');
+            this.singularity.style.cssText = [
+                'position:fixed',
+                'left:50%',
+                'top:50%',
+                'width:14px',
+                'height:14px',
+                'margin:-7px 0 0 -7px',
+                'border-radius:50%',
+                'z-index:9550',
+                'pointer-events:none',
+                'background:radial-gradient(circle, #000 0%, #000 30%, rgba(0,240,255,0.6) 55%, transparent 75%)',
+                'box-shadow:0 0 30px rgba(0,240,255,0.5), 0 0 90px rgba(0,240,255,0.25)',
+                'opacity:0'
+            ].join(';');
+            document.body.appendChild(this.singularity);
+
+            this.spinRings();
+            this.initPortalWindow();
+            this.bindPortalGravity();
+        },
+
+        /* ============================================================
+           Р¦Р•РќРўР  РџРћР РўРђР›Рђ вЂ” canvas В«РѕРєРЅРѕ РІ РґСЂСѓРіРѕРµ РїСЂРѕСЃС‚СЂР°РЅСЃС‚РІРѕВ».
+           Р§Р°СЃС‚РёС†С‹ РіР»СѓР±РёРЅС‹, СЃРІРµС‚РѕРІС‹Рµ С‚РѕС‡РєРё, СЌРЅРµСЂРіРµС‚РёС‡РµСЃРєРёРµ РЅРёС‚Рё.
+           ============================================================ */
+
+        initPortalWindow() {
+            const canvas = $('.aiw-portal-canvas');
+            if (!canvas || !canvas.getContext) return;
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const DPR = Math.min(window.devicePixelRatio || 1, 2);
+            let W = 0, H = 0;
+            let particles = [];
+            let threads = [];
+            let running = false;
+            let rafId = 0;
+            let t = 0;
+
+            // СЃРѕСЃС‚РѕСЏРЅРёРµ hover: РґС‹С…Р°РЅРёРµ Рё РїСЂРёС‚СЏР¶РµРЅРёРµ
+            this._window = {
+                canvas, ctx,
+                hover: 0,          // 0..1 вЂ” СЃРіР»Р°Р¶РµРЅРЅС‹Р№ hover
+                targetHover: 0,
+                mx: 0, my: 0,      // СЃРґРІРёРі РєСѓСЂСЃРѕСЂР° РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ С†РµРЅС‚СЂР° (-1..1)
+                running: false
+            };
+
+            const DEEP = {
+                bg0: '#04060d',    // deep blue-black
+                bg1: '#030409',
+                particle: [        // С…РѕР»РѕРґРЅР°СЏ РїР°Р»РёС‚СЂР°: cyan / indigo / light-blue
+                    [140, 210, 255],
+                    [110, 160, 255],
+                    [90, 130, 220],
+                    [180, 225, 255]
+                ],
+                thread: [70, 140, 210]
+            };
+
+            const sizeCanvas = () => {
+                const rect = canvas.getBoundingClientRect();
+                if (!rect.width || !rect.height) return false;
+                W = Math.round(rect.width);
+                H = Math.round(rect.height);
+                canvas.width = W * DPR;
+                canvas.height = H * DPR;
+                ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+                return true;
+            };
+
+            const build = () => {
+                particles = [];
+                threads = [];
+
+                // ~46 С‡Р°СЃС‚РёС† РІ 3 СЃР»РѕСЏС… РіР»СѓР±РёРЅС‹
+                const count = isMobile() ? 26 : 46;
+                for (let i = 0; i < count; i++) {
+                    const depth = 0.3 + Math.random() * 0.7; // 0.3(РґР°Р»СЊ) .. 1(Р±Р»РёР¶Рµ)
+                    const ang = Math.random() * Math.PI * 2;
+                    const rad = Math.pow(Math.random(), 0.65); // РїР»РѕС‚РЅРµРµ Рє С†РµРЅС‚СЂСѓ
+                    particles.push({
+                        x: Math.cos(ang) * rad,      // РЅРѕСЂРјР°Р»РёР·РѕРІР°РЅРЅС‹Рµ РєРѕРѕСЂРґРёРЅР°С‚С‹
+                        y: Math.sin(ang) * rad,
+                        depth,
+                        speed: 0.05 + Math.random() * 0.16,
+                        phase: Math.random() * Math.PI * 2,
+                        color: DEEP.particle[(Math.random() * DEEP.particle.length) | 0],
+                        size: 0.4 + depth * 1.1,
+                        drift: 0.004 + Math.random() * 0.01,
+                        fade: Math.random() * Math.PI * 2,     // С„Р°Р·Р° РёСЃС‡РµР·РЅРѕРІРµРЅРёСЏ
+                        fadeSpeed: 0.15 + Math.random() * 0.4
+                    });
+                }
+
+                // 3 С‚РѕРЅРєРёРµ СЌРЅРµСЂРіРµС‚РёС‡РµСЃРєРёРµ РЅРёС‚Рё
+                const tcount = isMobile() ? 2 : 3;
+                for (let i = 0; i < tcount; i++) {
+                    threads.push({
+                        ang0: Math.random() * Math.PI * 2,
+                        angSpeed: (Math.random() > 0.5 ? 1 : -1) * (0.1 + Math.random() * 0.2),
+                        wobble: 0.15 + Math.random() * 0.2,
+                        phase: Math.random() * Math.PI * 2,
+                        depth: 0.4 + Math.random() * 0.4
+                    });
+                }
+            };
+
+            const draw = (now) => {
+                if (!running) return;
+
+                const w = this._window;
+                // СЃРіР»Р°Р¶РёРІР°РЅРёРµ hover Рё РґС‹С…Р°РЅРёРµ
+                w.hover += (w.targetHover - w.hover) * 0.04;
+                t += 0.016 * (1 + w.hover * 0.9); // РїСЂРё hover РІСЂРµРјСЏ С‚РµС‡С‘С‚ Р±С‹СЃС‚СЂРµРµ
+
+                const cx = W / 2, cy = H / 2;
+                const R = Math.min(W, H) / 2;
+
+                // С„РѕРЅ: РіР»СѓР±РѕРєРёР№ РіСЂР°РґРёРµРЅС‚ + Р»С‘РіРєРѕРµ В«РґС‹С…Р°РЅРёРµВ» РјР°СЃС€С‚Р°Р±Р°
+                const breath = 1 + Math.sin(t * 0.35) * 0.015 * (0.4 + w.hover);
+                ctx.clearRect(0, 0, W, H);
+
+                const bg = ctx.createRadialGradient(
+                    cx + w.mx * 6, cy + w.my * 6, R * 0.05,
+                    cx, cy, R * 1.05 * breath
+                );
+                bg.addColorStop(0, '#0a1128');   // С‚РѕРЅРєРёР№ indigo РІ С†РµРЅС‚СЂРµ
+                bg.addColorStop(0.45, DEEP.bg0);
+                bg.addColorStop(1, DEEP.bg1);
+                ctx.fillStyle = bg;
+                ctx.beginPath();
+                ctx.arc(cx, cy, R, 0, Math.PI * 2);
+                ctx.fill();
+
+                // С‡Р°СЃС‚РёС†С‹: РёСЃРєСЂРёРІР»С‘РЅРЅС‹Рµ РѕСЂР±РёС‚С‹ + РёСЃС‡РµР·РЅРѕРІРµРЅРёРµ РІ РіР»СѓР±РёРЅРµ
+                particles.forEach(p => {
+                    p.phase += p.drift * (1 + w.hover * 0.7);
+                    p.fade += p.fadeSpeed * 0.016;
+
+                    const orbit = 0.18 + (1 - p.depth) * 0.72; // РґР°Р»СЊРЅРёРµ вЂ” Р±Р»РёР¶Рµ Рє С†РµРЅС‚СЂСѓ
+                    const ang = p.phase + t * p.speed * 0.3;
+                    const wob = Math.sin(ang * 2.2 + p.depth * 7) * 0.08; // РєСЂРёРІРёР·РЅР° С‚СЂР°РµРєС‚РѕСЂРёРё
+
+                    let px = Math.cos(ang + wob) * orbit;
+                    let py = Math.sin(ang + wob) * orbit * 0.92;
+
+                    // Р»С‘РіРєРёР№ СЃРґРІРёРі РѕС‚ РєСѓСЂСЃРѕСЂР° (РіР»СѓР±РёРЅР° РІР»РёСЏРµС‚ РЅР° СЃРёР»Сѓ)
+                    px += w.mx * 0.05 * p.depth * w.hover;
+                    py += w.my * 0.05 * p.depth * w.hover;
+
+                    // РјРµСЂС†Р°РЅРёРµ/РёСЃС‡РµР·РЅРѕРІРµРЅРёРµ РІ РіР»СѓР±РёРЅРµ
+                    const tw = 0.55 + Math.sin(p.fade) * 0.45;
+                    const alpha = tw * (0.25 + p.depth * 0.55) * (0.85 + w.hover * 0.35);
+
+                    const sx = cx + px * R * 1.15;
+                    const sy = cy + py * R * 1.15;
+
+                    // Р·Р° РїСЂРµРґРµР»Р°РјРё РєСЂСѓРіР° вЂ” РЅРµ СЂРёСЃСѓРµРј (clip РїРѕ В«РѕРєРЅСѓВ»)
+                    const dd = Math.hypot(sx - cx, sy - cy);
+                    if (dd > R - 1) return;
+
+                    ctx.fillStyle =
+                        'rgba(' + p.color[0] + ',' + p.color[1] + ',' + p.color[2] + ',' + alpha.toFixed(3) + ')';
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, p.size * (0.8 + p.depth * 0.5), 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                // СЌРЅРµСЂРіРµС‚РёС‡РµСЃРєРёРµ РЅРёС‚Рё: С‚РѕРЅРєРёРµ РґСѓРіРё
+                threads.forEach(th => {
+                    th.ang0 += th.angSpeed * 0.0035 * (1 + w.hover);
+
+                    ctx.strokeStyle = 'rgba(' +
+                        DEEP.thread[0] + ',' + DEEP.thread[1] + ',' + DEEP.thread[2] + ',' +
+                        (0.10 + w.hover * 0.12).toFixed(3) + ')';
+                    ctx.lineWidth = 0.6;
+
+                    ctx.beginPath();
+                    const steps = 24;
+                    for (let s = 0; s <= steps; s++) {
+                        const u = s / steps;
+                        const r0 = 0.25 + u * 0.65 * th.depth;
+                        const a = th.ang0 + u * Math.PI * 1.2 +
+                            Math.sin(t * 0.5 + th.phase + u * 3) * th.wobble * 0.3;
+                        const px = cx + Math.cos(a) * r0 * R;
+                        const py = cy + Math.sin(a) * r0 * R * 0.9;
+                        if (s === 0) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                    ctx.stroke();
+                });
+
+                // СЂРµРґРєРёРµ СЃРІРµС‚РѕРІС‹Рµ С‚РѕС‡РєРё: РІСЃРїС‹С€РєРё РЅР° РєСЂР°СЋ РіР»СѓР±РёРЅС‹
+                if (Math.random() < 0.012 + w.hover * 0.02) {
+                    const a = Math.random() * Math.PI * 2;
+                    const rr = R * (0.25 + Math.random() * 0.5);
+                    const fx = cx + Math.cos(a) * rr;
+                    const fy = cy + Math.sin(a) * rr;
+                    const g = ctx.createRadialGradient(fx, fy, 0, fx, fy, 5);
+                    g.addColorStop(0, 'rgba(160, 220, 255, 0.5)');
+                    g.addColorStop(1, 'rgba(160, 220, 255, 0)');
+                    ctx.fillStyle = g;
+                    ctx.beginPath();
+                    ctx.arc(fx, fy, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                rafId = requestAnimationFrame(draw);
+            };
+
+            // Р·Р°РїСѓСЃРє С‚РѕР»СЊРєРѕ РєРѕРіРґР° РїРѕСЂС‚Р°Р» РІ viewport вЂ” СЌРєРѕРЅРѕРјРёСЏ CPU
+            const start = () => {
+                if (running) return;
+                if (!sizeCanvas()) {
+                    // РїРѕСЂС‚ РµС‰С‘ РЅРµ РѕС‚СЂРµРЅРґРµСЂРµРЅ вЂ” РїРѕРІС‚РѕСЂРёРј
+                    setTimeout(start, 200);
+                    return;
+                }
+                build();
+                running = true;
+                if (!prefersReducedMotion()) rafId = requestAnimationFrame(draw);
+            };
+
+            const stop = () => {
+                running = false;
+                cancelAnimationFrame(rafId);
+            };
+
+            // Р·Р°РїСѓСЃРє: first paint РёР»Рё РїРѕРїР°РґР°РЅРёРµ РІ viewport
+            if ('IntersectionObserver' in window) {
+                const io = new IntersectionObserver((entries) => {
+                    entries.forEach(en => {
+                        if (en.isIntersecting) start();
+                        else if (running && document.hidden) stop();
+                    });
+                }, { threshold: 0.05 });
+                io.observe(canvas);
+            } else {
+                start();
+            }
+
+            // РїРµСЂРµСЃР±РѕСЂРєР° РїСЂРё СЂРµСЃР°Р№Р·Рµ
+            let rsT;
+            window.addEventListener('resize', () => {
+                clearTimeout(rsT);
+                rsT = setTimeout(() => {
+                    if (running) { sizeCanvas(); build(); }
+                }, 250);
+            });
+
+            this._windowStop = stop;
+        },
+
+        /* ============================================================
+           HOVER GRAVITY: hero-СЌР»РµРјРµРЅС‚С‹ РёСЃРїС‹С‚С‹РІР°СЋС‚ СЃР»Р°Р±РѕРµ РїСЂРёС‚СЏР¶РµРЅРёРµ.
+           ============================================================ */
+
+        bindPortalGravity() {
+            const trigger = $('.aiw-portal-trigger');
+            const heroRow = $('.aiw-hero-row');
+            const pageHeader = $('.wrapper > header');
+            const grid = $('.grid');
+            if (!trigger) return;
+
+            const w = this._window;
+
+            const setGravity = (on) => {
+                if (heroRow) heroRow.classList.toggle('aiw-gravity', on);
+                if (pageHeader) pageHeader.classList.toggle('aiw-gravity', on);
+                if (grid) grid.classList.toggle('aiw-gravity', on);
+                if (w) w.targetHover = on ? 1 : 0;
+
+                // РѕСЂР±РёС‚С‹: С‡СѓС‚СЊ РјРµРЅСЏСЋС‚ СЃРєРѕСЂРѕСЃС‚СЊ РїСЂРё hover
+                if (gsapOK() && !prefersReducedMotion()) {
+                    $$('.aiw-portal-ring').forEach((ring, i) => {
+                        gsap.to(ring, {
+                            rotation: '+=' + (on ? 8 : -4),
+                            duration: on ? 2.4 : 2.0,
+                            ease: 'power2.inOut'
+                        });
+                    });
+                }
+            };
+
+            trigger.addEventListener('mouseenter', () => setGravity(true));
+            trigger.addEventListener('mouseleave', () => setGravity(false));
+
+            // mobile: tap-РІР·Р°РёРјРѕРґРµР№СЃС‚РІРёРµ РІРјРµСЃС‚Рѕ hover
+            if (isMobile()) {
+                trigger.addEventListener('touchstart', () => {
+                    setGravity(true);
+                    setTimeout(() => setGravity(false), 1400);
+                }, { passive: true });
+            }
+
+            // РїРѕР»РѕР¶РµРЅРёРµ РєСѓСЂСЃРѕСЂР°: РІРЅСѓС‚СЂРµРЅРЅСЏСЏ СЌРЅРµСЂРіРёСЏ СЃР»РµРіРєР° СЃРјРµС‰Р°РµС‚СЃСЏ
+            if (w && !isMobile()) {
+                trigger.addEventListener('mousemove', (e) => {
+                    const r = trigger.getBoundingClientRect();
+                    w.mx = ((e.clientX - r.left) / r.width - 0.5) * 2;   // -1..1
+                    w.my = ((e.clientY - r.top) / r.height - 0.5) * 2;
+                }, { passive: true });
+
+                trigger.addEventListener('mouseleave', () => {
+                    if (w) { w.mx = 0; w.my = 0; }
+                });
+            }
+
+            this._setGravity = setGravity;
+        },
+
+        /* Р±РµСЃРєРѕРЅРµС‡РЅРѕРµ РІСЂР°С‰РµРЅРёРµ РєРѕР»РµС† РІРѕСЂРѕРЅРєРё; РїРµСЂРµР·Р°РїСѓСЃРєР°РµС‚СЃСЏ РїРѕСЃР»Рµ СЃР±СЂРѕСЃР° */
+        spinRings() {
+            if (prefersReducedMotion() || !gsapOK()) return;
+            gsap.killTweensOf($$('.aiw-portal-ring'));
+            $$('.aiw-portal-ring').forEach((ring, i) => {
+                gsap.to(ring, {
+                    rotation: 360,
+                    duration: 14 + i * 9,
+                    repeat: -1,
+                    ease: 'none'
+                });
+            });
+        },
+
+        /* СЌР»РµРјРµРЅС‚С‹, Р·Р°С‚СЏРіРёРІР°РµРјС‹Рµ РІ РІРѕСЂРѕРЅРєСѓ */
+        prey() {
+            // РіСЂР°РЅСѓР»СЏСЂРЅРѕ: Р·Р°РіРѕР»РѕРІРѕРє, РєР°СЂС‚РѕС‡РєРё, С€РѕСѓСЂРёР», С„СѓС‚РµСЂ
+            const granular = $$('.wrapper > header, .aiw-portal-trigger, .card, .showreel-footer-block, .wrapper > footer');
+            if (granular.length) return granular;
+            const fallback = $$('.wrapper > *');
+            return fallback.length ? fallback : [$('.wrapper')].filter(Boolean);
+        },
+
+        /* hero-РєРѕРЅС‚РµРЅС‚ Р·Р°С‚СЏРіРёРІР°РµС‚СЃСЏ РїРѕ РёРЅРґРёРІРёРґСѓР°Р»СЊРЅС‹Рј С‚СЂР°РµРєС‚РѕСЂРёСЏРј */
+        preyExtra() {
+            return $$('.hero > *');
+        },
+
+        center() {
+            const v = window.innerHeight, h = window.innerWidth;
+            return { x: h / 2, y: v / 2 };
+        },
+
+        /* --- С„Р°Р·Р° 1: РїРѕРіР»РѕС‰РµРЅРёРµ РёРЅС‚РµСЂС„РµР№СЃР° --- */
+        absorb(onDone) {
+            const c = this.center();
+            const prey = this.prey();
+
+            // canvas РѕРєРЅР°: СѓРІРѕРґРёРј РІ РјР°РєСЃРёРјСѓРј СЃРІРµС‡РµРЅРёСЏ РїРµСЂРµРґ РєРѕР»Р»Р°РїСЃРѕРј
+            if (this._window) this._window.targetHover = 1;
+
+            // СЃР±СЂРѕСЃ РІРѕР·РјРѕР¶РЅС‹С… РѕСЃС‚Р°С‚РѕС‡РЅС‹С… СЃС‚РёР»РµР№ РѕС‚ РїСЂРѕС€Р»РѕРіРѕ РїРµСЂРµС…РѕРґР°:
+            // absorb() Р°РЅРёРјРёСЂСѓРµС‚ РѕС‚ С‚РµРєСѓС‰РёС… Р·РЅР°С‡РµРЅРёР№
+            prey.concat(this.preyExtra()).forEach(el => {
+                if (!el) return;
+                el.style.opacity = '';
+                el.style.visibility = '';
+                el.style.transform = '';
+                el.style.filter = '';
+                el.style.borderColor = '';
+                el.style.boxShadow = '';
+            });
+            const trg = $('.aiw-portal-trigger');
+            if (trg) { trg.style.opacity = ''; trg.style.visibility = ''; }
+
+            if (!gsapOK() || prefersReducedMotion() || !prey.length) {
+                prey.forEach(el => { el.style.opacity = '0'; });
+                setTimeout(onDone, 300);
+                return;
+            }
+
+            // С‚РµР»Рѕ РіР°СЃРЅРµС‚ Рє С‡С‘СЂРЅРѕРјСѓ вЂ” РєРѕСЃРјРѕСЃ РїРµСЂРµРґ РєРѕР»Р»Р°РїСЃРѕРј
+            gsap.to('body', {
+                backgroundColor: '#030304',
+                duration: 0.9,
+                ease: 'power2.in'
+            });
+
+            prey.forEach((el, i) => {
+                const r = el.getBoundingClientRect();
+                const dx = c.x - (r.left + r.width / 2);
+                const dy = c.y - (r.top + r.height / 2);
+                const dist = Math.hypot(dx, dy);
+                // С‡РµРј РґР°Р»СЊС€Рµ СЌР»РµРјРµРЅС‚ вЂ” С‚РµРј РїРѕР·Р¶Рµ РѕРЅ СЃСЂС‹РІР°РµС‚СЃСЏ Рє С†РµРЅС‚СЂСѓ
+                const delay = i * 0.05 + Math.min(dist / 2600, 0.22);
+                const spiral = (i % 2 ? 1 : -1);
+
+                gsap.fromTo(el, {
+                    // РґРµС‚РµСЂРјРёРЅРёСЂРѕРІР°РЅРЅС‹Р№ СЃС‚Р°СЂС‚: Р±РµР· РєРµС€Р° РїСЂРѕС€Р»РѕРіРѕ С†РёРєР»Р°
+                    x: 0, y: 0, scale: 1, rotation: 0, opacity: 1
+                }, {
+                    // СЃРїРёСЂР°Р»СЊРЅР°СЏ С‚СЂР°РµРєС‚РѕСЂРёСЏ: РЅРµ С‡РёСЃС‚Рѕ СЂР°РґРёР°Р»СЊРЅР°СЏ
+                    x: dx * 0.92 + spiral * Math.min(dist * 0.18, 140),
+                    y: dy * 0.92 - Math.min(Math.abs(dist * 0.12), 90),
+                    scale: 0.02,
+                    rotation: spiral * (24 + dist * 0.014),
+                    opacity: 0,
+                    filter: 'blur(14px)',
+                    transformOrigin: 'center center',
+                    duration: 1.15,
+                    delay,
+                    ease: 'power3.in',
+                    force3D: true
+                });
+
+                // С†РёР°РЅРѕРІРѕРµ СЃРІРµС‡РµРЅРёРµ вЂ” С‚РѕР»СЊРєРѕ СЌР»РµРјРµРЅС‚Р°Рј СЃ СЂР°РјРєРѕР№ (РєР°СЂС‚РѕС‡РєРё),
+                // РќР• С‚СЂРёРіРіРµСЂСѓ РІРѕСЂРѕРЅРєРё: box-shadow СЂРёСЃСѓРµС‚ РєРІР°РґСЂР°С‚ РІРѕРєСЂСѓРі РєСЂСѓРіР°
+                if (el.classList.contains('card')) {
+                    gsap.to(el, {
+                        borderColor: 'rgba(0, 240, 255, 0.6)',
+                        boxShadow: '0 0 60px rgba(0, 240, 255, 0.35)',
+                        duration: 0.8,
+                        delay: delay + 0.2,
+                        ease: 'power2.in'
+                    });
+                }
+            });
+
+            // hero-РєРѕРЅС‚РµРЅС‚: СЃРѕР±СЃС‚РІРµРЅРЅС‹Рµ С‚СЂР°РµРєС‚РѕСЂРёРё (h1 Рё РѕРїРёСЃР°РЅРёРµ РІСЂС‹РІР°СЋС‚СЃСЏ СЂР°РЅСЊС€Рµ)
+            this.preyExtra().forEach((el, i) => {
+                const r = el.getBoundingClientRect();
+                const dx = c.x - (r.left + r.width / 2);
+                const dy = c.y - (r.top + r.height / 2);
+
+                gsap.fromTo(el, {
+                    x: 0, y: 0, scale: 1, rotation: 0, opacity: 1
+                }, {
+                    x: dx * 0.9,
+                    y: dy * 0.9,
+                    scale: 0.03,
+                    rotation: (i % 2 ? 1 : -1) * 30,
+                    opacity: 0,
+                    filter: 'blur(10px)',
+                    duration: 1.0,
+                    delay: 0.1 + i * 0.08,
+                    ease: 'power3.in',
+                    force3D: true
+                });
+            });
+
+            // СЃР°Рј РїРѕСЂС‚Р°Р» СЂР°СЃРєСЂС‹РІР°РµС‚СЃСЏ Рё В«РґС‹С€РёС‚В» вЂ” СЃС‚Р°СЂС‚ СЃС‚СЂРѕРіРѕ РёР· РЅСѓР»СЏ
+            const trigger = $('.aiw-portal-trigger');
+            if (trigger) {
+                gsap.fromTo(trigger, {
+                    x: 0, y: 0, scale: 1, rotation: 0, opacity: 1, filter: 'none'
+                }, {
+                    scale: 2.4,
+                    opacity: 0,
+                    filter: 'blur(8px)',
+                    duration: 1.0,
+                    delay: 0.35,
+                    ease: 'power2.in'
+                });
+                // СЏРґСЂРѕ РІРѕСЂРѕРЅРєРё СЂР°Р·РіРѕСЂР°РµС‚СЃСЏ РїСЂРё РїРѕРіР»РѕС‰РµРЅРёРё
+                const core = $('.aiw-portal-core', trigger);
+                if (core) {
+                    gsap.fromTo(core,
+                        { boxShadow: '0 0 40px rgba(0,240,255,0.25), 0 0 90px rgba(0,240,255,0.12)' },
+                        {
+                            boxShadow: '0 0 160px rgba(0,240,255,0.9), 0 0 300px rgba(0,240,255,0.4)',
+                            duration: 0.9,
+                            ease: 'power2.in'
+                        });
+                }
+            }
+
+            // С‡РµСЂРµР· 1450РјСЃ РёРЅС‚РµСЂС„РµР№СЃ СЃС‡РёС‚Р°РµС‚СЃСЏ РїРѕРіР»РѕС‰С‘РЅРЅС‹Рј: РґСѓР±Р»РёСЂСѓРµРј СЃРєСЂС‹С‚РёРµ
+            // РїСЂСЏРјС‹Рј CSS, РЅРµ Р·Р°РІРёСЃСЏС‰РёРј РѕС‚ GSAP-С‚РёРєРµСЂР°
+            setTimeout(() => {
+                prey.forEach(el => { el.style.opacity = '0'; el.style.visibility = 'hidden'; });
+                this.preyExtra().forEach(el => { el.style.opacity = '0'; el.style.visibility = 'hidden'; });
+                const trigger = $('.aiw-portal-trigger');
+                if (trigger) { trigger.style.opacity = '0'; trigger.style.visibility = 'hidden'; }
+                onDone();
+            }, 1450);
+        },
+
+        /* --- С„Р°Р·Р° 2: РєРѕР»Р»Р°РїСЃ в†’ Р±РµР»С‹Р№ РїРµСЂРµС…РѕРґ --- */
+        collapse(onDone) {
+            const t = this.transition;
+            t.classList.add('aiw-visible');
+
+            // РµРґРёРЅС‹Р№ Р·Р°РјС‹РєР°РЅРёРµ: Рё Р°РЅРёРјР°С†РёСЏ, Рё СЃС‚СЂР°С…РѕРІРєР° РёРґСѓС‚ С‡РµСЂРµР· РћР”РРќ С„Р»Р°Рі
+            let finished = false;
+            const done = () => {
+                if (finished) return;
+                finished = true;
+                // РїРѕР»РЅР°СЏ РѕС‡РёСЃС‚РєР° РІРёР·СѓР°Р»Р° РєРѕР»Р»Р°РїСЃР° Р’ Р›Р®Р‘РћРњ РїСѓС‚Рё Р·Р°РІРµСЂС€РµРЅРёСЏ
+                if (gsapOK()) {
+                    gsap.killTweensOf([this.singularity, this.burst]);
+                    gsap.set(this.singularity, { opacity: 0, scale: 1 });
+                    gsap.set(this.burst, { opacity: 0, scale: 0 });
+                }
+                onDone();
+            };
+
+            if (!gsapOK() || prefersReducedMotion()) {
+                setTimeout(done, 250);
+                return;
+            }
+
+            // СЃРёРЅРіСѓР»СЏСЂРЅРѕСЃС‚СЊ: РїСѓР»СЊСЃ в†’ СЂРµР·РєРѕРµ СЃР¶Р°С‚РёРµ в†’ РІСЃРїС‹С€РєР° Р±РµР»С‹Рј РёР· С†РµРЅС‚СЂР°
+            gsap.set(this.singularity, { opacity: 1, scale: 1 });
+            gsap.to(this.singularity, {
+                scale: 2.2,
+                duration: 0.28,
+                ease: 'power2.out'
+            });
+            gsap.to(this.singularity, {
+                scale: 0.05,
+                opacity: 0,
+                duration: 0.35,
+                delay: 0.32,
+                ease: 'power4.in',
+                onComplete: () => {
+                    // Р±РµР»С‹Р№ burst СЂР°СЃРєСЂС‹РІР°РµС‚СЃСЏ РёР· С†РµРЅС‚СЂР° СЌРєСЂР°РЅР° Рё РЅР°РєСЂС‹РІР°РµС‚ РІСЃС‘
+                    gsap.set(this.burst, { opacity: 1, scale: 0 });
+                    gsap.to(this.burst, {
+                        scale: 300,
+                        duration: 0.55,
+                        ease: 'power3.out',
+                        onComplete: done
+                    });
+                }
+            });
+
+            // СЃС‚СЂР°С…РѕРІРєР°: РµСЃР»Рё rAF Р·Р°РјРѕСЂРѕР¶РµРЅ (С„РѕРЅРѕРІРѕР№ РІРєР»Р°РґРєРѕР№, headless-СЂРµР¶РёРјРѕРј),
+            // РїРµСЂРµС…РѕРґ РІСЃС‘ СЂР°РІРЅРѕ Р·Р°РІРµСЂС€РёС‚СЃСЏ РєРѕСЂСЂРµРєС‚РЅРѕ
+            setTimeout(done, 2200);
+        },
+
+        /* --- РјРіРЅРѕРІРµРЅРЅС‹Р№ СЃР±СЂРѕСЃ РїРѕСЂС‚Р°Р»Р° --- */
+        reset() {
+            if (this.singularity) {
+                if (gsapOK()) gsap.set(this.singularity, { opacity: 0, scale: 1 });
+                else this.singularity.style.opacity = '0';
+            }
+            if (this.burst) {
+                if (gsapOK()) gsap.set(this.burst, { opacity: 0, scale: 0 });
+                else { this.burst.style.opacity = '0'; this.burst.style.transform = 'scale(0)'; }
+            }
+            if (this.veil) {
+                if (gsapOK()) gsap.set(this.veil, { scale: 0 });
+                else this.veil.style.transform = 'scale(0)';
+            }
+        },
+
+        /* --- С„Р°Р·Р° 2 РґР»СЏ РѕР±СЂР°С‚РЅРѕРіРѕ РїРµСЂРµС…РѕРґР°: С‚С‘РјРЅС‹Р№ РєРѕР»Р»Р°РїСЃ РёР· Р±РµР»РѕРіРѕ --- */
+        collapseDark(onDone) {
+            const t = this.transition;
+            t.classList.add('aiw-visible');
+
+            let finished = false;
+            const done = () => {
+                if (finished) return;
+                finished = true;
+                // РІСѓР°Р»СЊ Р”РћР›Р–РќРђ РѕСЃС‚Р°С‚СЊСЃСЏ РЅР°С‚СЏРЅСѓС‚РѕР№: РїРѕРґ РЅРµР№ СЃРµР№С‡Р°СЃ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ
+                // РїРѕСЂС‚С„РѕР»РёРѕ, СЃРЅРёРјРµРј РµС‘ РІ bloomDark
+                if (gsapOK()) {
+                    gsap.killTweensOf(this.veil);
+                    gsap.set(this.veil, { scale: 1 });
+                } else {
+                    this.veil.style.transform = 'scale(1)';
+                }
+                onDone();
+            };
+
+            if (!gsapOK() || prefersReducedMotion()) {
+                gsap.set(this.veil, { scale: 1 });
+                setTimeout(done, 300);
+                return;
+            }
+
+            // Р·РµСЂРєР°Р»СЊРЅРѕ РІС…РѕРґСѓ: РѕР±РѕР»РѕС‡РєРё СѓР¶Рµ Р·Р°С‚СЏРЅСѓС‚С‹, С‚С‘РјРЅР°СЏ РІСѓР°Р»СЊ
+            // СЂР°СЃРїРѕР»Р·Р°РµС‚СЃСЏ РѕС‚ С†РµРЅС‚СЂР° Рё РЅР°РєСЂС‹РІР°РµС‚ Р±РµР»С‹Р№ РјРёСЂ
+            gsap.set(this.veil, { scale: 0 });
+            gsap.to(this.veil, {
+                scale: 1,
+                duration: 0.6,
+                ease: 'power3.in',
+                onComplete: done
+            });
+            setTimeout(done, 1400); // СЃС‚СЂР°С…РѕРІРєР° РѕС‚ Р·Р°РјРѕСЂРѕР¶РµРЅРЅРѕРіРѕ rAF
+        },
+
+        /* --- С„Р°Р·Р° 3 РґР»СЏ РѕР±СЂР°С‚РЅРѕРіРѕ РїРµСЂРµС…РѕРґР°: С‚СЊРјР° РѕС‚СЃС‚СѓРїР°РµС‚ --- */
+        bloomDark(onDone) {
+            // РІСѓР°Р»СЊ СЃРЅСЏС‚Р°, РѕРІРµСЂР»РµР№ РґРµР°РєС‚РёРІРёСЂРѕРІР°РЅ вЂ” С‡РёСЃС‚С‹Р№ С„РёРЅР°Р»
+            const cleanup = () => {
+                this.transition.classList.remove('aiw-visible');
+                if (gsapOK()) {
+                    gsap.killTweensOf(this.veil);
+                    gsap.set(this.veil, { scale: 0 });
+                } else {
+                    this.veil.style.transform = 'scale(0)';
+                }
+            };
+
+            if (!gsapOK() || prefersReducedMotion()) {
+                cleanup();
+                setTimeout(onDone, 200);
+                return;
+            }
+
+            // РІСѓР°Р»СЊ С‚СЊРјС‹ РѕС‚СЃС‚СѓРїР°РµС‚: РїРѕСЂС‚С„РѕР»РёРѕ СѓР¶Рµ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРѕ РїРѕРґ РЅРµР№
+            let finished = false;
+            const done = () => {
+                if (finished) return;
+                finished = true;
+                cleanup();
+                onDone();
+            };
+
+            gsap.to(this.veil, {
+                scale: 0,
+                duration: 0.75,
+                delay: 0.05,
+                ease: 'power3.out',
+                onComplete: done
+            });
+            setTimeout(done, 1600); // СЃС‚СЂР°С…РѕРІРєР°
+        },
+
+        /* --- С„Р°Р·Р° 4 РѕР±СЂР°С‚РЅРѕРіРѕ РїРµСЂРµС…РѕРґР°: РёРЅС‚РµСЂС„РµР№СЃ Р’Р«Р›Р•РўРђР•Рў РёР· С†РµРЅС‚СЂР°.
+           Р—РµСЂРєР°Р»СЊРЅРѕ absorb(): СЌР»РµРјРµРЅС‚С‹ РїРѕСЏРІР»СЏСЋС‚СЃСЏ РёР· С‚РѕС‡РєРё РєРѕР»Р»Р°РїСЃР°
+           Рё СЂР°Р·Р»РµС‚Р°СЋС‚СЃСЏ РЅР° СЃРІРѕРё РјРµСЃС‚Р° вЂ” РїРѕСЂС‚Р°Р» РІРјРµСЃС‚Рµ СЃРѕ РІСЃРµРјРё. --- */
+        emerge(onDone) {
+            const c = this.center();
+            const prey = this.prey();
+            const extras = this.preyExtra();
+            const trigger = $('.aiw-portal-trigger');
+
+            // 0. РјРіРЅРѕРІРµРЅРЅРѕ (РїРѕРєР° РІСѓР°Р»СЊ РµС‰С‘ Р·Р°РєСЂС‹РІР°РµС‚ СЌРєСЂР°РЅ) СЃС‚Р°РІРёРј РІСЃС‘
+            // РІ В«СЃС…Р»РѕРїРЅСѓС‚РѕРµВ» СЃРѕСЃС‚РѕСЏРЅРёРµ: СЌР»РµРјРµРЅС‚С‹ РІ С†РµРЅС‚СЂРµ, РЅРµРІРёРґРёРјС‹
+            const collapseAll = () => {
+                prey.concat(extras).forEach(el => {
+                    if (!el) return;
+                    const r = el.getBoundingClientRect();
+                    const dx = c.x - (r.left + r.width / 2);
+                    const dy = c.y - (r.top + r.height / 2);
+                    el.style.transform = 'translate(' + (dx * 0.92) + 'px,' +
+                        (dy * 0.92) + 'px) scale(0.02)';
+                    el.style.opacity = '0';
+                    el.style.filter = 'blur(14px)';
+                    el.style.visibility = 'visible';
+                });
+                if (trigger) {
+                    const r = trigger.getBoundingClientRect();
+                    const dx = c.x - (r.left + r.width / 2);
+                    const dy = c.y - (r.top + r.height / 2);
+                    trigger.style.transform =
+                        'translate(' + dx + 'px,' + dy + 'px) scale(0.4)';
+                    trigger.style.opacity = '0';
+                    trigger.style.filter = 'blur(10px)';
+                    trigger.style.visibility = 'visible';
+                }
+            };
+
+            collapseAll();
+
+            if (!gsapOK() || prefersReducedMotion()) {
+                // РјСЏРіРєРёР№ РІР°СЂРёР°РЅС‚: РїСЂРѕСЃС‚Рѕ РїРѕРєР°Р·Р°С‚СЊ РІСЃС‘ РЅР° РјРµСЃС‚Р°С…
+                prey.concat(extras).concat([trigger]).forEach(el => {
+                    if (!el) return;
+                    el.style.transform = '';
+                    el.style.opacity = '';
+                    el.style.filter = '';
+                });
+                setTimeout(onDone, 300);
+                return;
+            }
+
+            let finished = false;
+            const done = () => {
+                if (finished) return;
+                finished = true;
+                // С„РёРЅР°Р»СЊРЅС‹Р№ СЃР±СЂРѕСЃ inline-СЃС‚РёР»РµР№ вЂ” С‡РёСЃС‚РѕРµ РёСЃС…РѕРґРЅРѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ
+                prey.concat(extras).concat([trigger]).forEach(el => {
+                    if (!el) return;
+                    el.style.transform = '';
+                    el.style.opacity = '';
+                    el.style.filter = '';
+                    el.style.visibility = '';
+                });
+                onDone();
+            };
+
+            // РїРѕСЂС‚Р°Р» РІС‹Р»РµС‚Р°РµС‚ РїРµСЂРІС‹Рј вЂ” РѕРєРЅРѕ СЂР°СЃРєСЂС‹РІР°РµС‚СЃСЏ
+            if (trigger) {
+                const r = trigger.getBoundingClientRect();
+                const dx = c.x - (r.left + r.width / 2);
+                const dy = c.y - (r.top + r.height / 2);
+                gsap.fromTo(trigger, {
+                    x: dx, y: dy, scale: 0.4, rotation: 20, opacity: 0,
+                    filter: 'blur(10px)'
+                }, {
+                    x: 0, y: 0, scale: 1, rotation: 0, opacity: 1,
+                    filter: 'none',
+                    duration: 1.1,
+                    ease: 'power3.out',
+                    force3D: true
+                });
+            }
+
+            // РёРЅС‚РµСЂС„РµР№СЃ СЂР°Р·Р»РµС‚Р°РµС‚СЃСЏ РёР· С†РµРЅС‚СЂР° вЂ” Р·РµСЂРєР°Р»СЊРЅРѕ РїРѕРіР»РѕС‰РµРЅРёСЋ
+            prey.forEach((el, i) => {
+                const r = el.getBoundingClientRect();
+                const dx = c.x - (r.left + r.width / 2);
+                const dy = c.y - (r.top + r.height / 2);
+                const dist = Math.hypot(dx, dy);
+                const delay = 0.15 + i * 0.05 + Math.min(dist / 2600, 0.2);
+                const spiral = (i % 2 ? 1 : -1);
+
+                gsap.fromTo(el, {
+                    // СЃС‚Р°СЂС‚: СЃС…Р»РѕРїРЅСѓС‚РѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ (СѓСЃС‚Р°РЅРѕРІР»РµРЅРѕ collapseAll)
+                    x: dx * 0.92 + spiral * Math.min(dist * 0.18, 140),
+                    y: dy * 0.92 - Math.min(Math.abs(dist * 0.12), 90),
+                    scale: 0.02,
+                    rotation: spiral * (24 + dist * 0.014),
+                    opacity: 0,
+                    filter: 'blur(14px)'
+                }, {
+                    x: 0, y: 0, scale: 1, rotation: 0,
+                    opacity: 1,
+                    filter: 'none',
+                    duration: 1.05,
+                    delay,
+                    ease: 'power3.out',
+                    force3D: true
+                });
+            });
+
+            extras.forEach((el, i) => {
+                const r = el.getBoundingClientRect();
+                const dx = c.x - (r.left + r.width / 2);
+                const dy = c.y - (r.top + r.height / 2);
+
+                gsap.fromTo(el, {
+                    x: dx * 0.9, y: dy * 0.9, scale: 0.03,
+                    rotation: (i % 2 ? 1 : -1) * 30,
+                    opacity: 0, filter: 'blur(10px)'
+                }, {
+                    x: 0, y: 0, scale: 1, rotation: 0,
+                    opacity: 1, filter: 'none',
+                    duration: 0.95,
+                    delay: 0.1 + i * 0.07,
+                    ease: 'power3.out',
+                    force3D: true
+                });
+            });
+
+            setTimeout(done, 1900); // СЃС‚СЂР°С…РѕРІРєР°
+        },
+
+        /* --- С„Р°Р·Р° 3: Р±РµР»С‹Р№ СЌРєСЂР°РЅ СЂР°СЃС‚РІРѕСЂСЏРµС‚СЃСЏ --- */
+        bloom(onDone) {
+            // РІС‹Р·С‹РІР°РµС‚СЃСЏ РєРѕРіРґР° AI World СѓР¶Рµ РїРѕРґ РЅРёРј Рё РІРёРґРµРЅ
+            const cleanup = () => {
+                this.transition.classList.remove('aiw-visible');
+                // РїРѕРіР°СЃРёС‚СЊ burst Рё РІРµСЂРЅСѓС‚СЊ РѕРІРµСЂР»РµР№ РІ РёСЃС…РѕРґРЅРѕРµ СЃРєСЂС‹С‚РѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ
+                if (gsapOK()) {
+                    gsap.killTweensOf([this.burst, this.transition]);
+                    gsap.set(this.burst, { opacity: 0, scale: 0 });
+                    gsap.set(this.transition, { opacity: 0 });
+                } else {
+                    this.burst.style.opacity = '0';
+                    this.burst.style.transform = 'scale(0)';
+                    this.transition.style.opacity = '0';
+                }
+            };
+
+            if (!gsapOK() || prefersReducedMotion()) {
+                cleanup();
+                setTimeout(onDone, 200);
+                return;
+            }
+
+            let finished = false;
+            const done = () => {
+                if (finished) return;
+                finished = true;
+                cleanup();
+                onDone();
+            };
+
+            // РІСЃРїС‹С€РєР° РіР°СЃРЅРµС‚, РѕРІРµСЂР»РµР№ СЂР°СЃС‚РІРѕСЂСЏРµС‚СЃСЏ вЂ” AI World РїРѕРґ РЅРёРј
+            gsap.to(this.burst, {
+                scale: 600,
+                opacity: 0,
+                duration: 0.7,
+                ease: 'power2.out'
+            });
+
+            gsap.to(this.transition, {
+                opacity: 0,
+                duration: 0.85,
+                delay: 0.1,
+                ease: 'power2.out',
+                onComplete: done
+            });
+            setTimeout(done, 1500); // СЃС‚СЂР°С…РѕРІРєР°: Рё РІСЃРїС‹С€РєР°, Рё РѕРІРµСЂР»РµР№ Р±СѓРґСѓС‚ РїРѕРіР°С€РµРЅС‹
+        }
+    };
+
+    /* ============================================================
+       AI WORLD вЂ” СЃРѕСЃС‚РѕСЏРЅРёРµ СЃР°Р№С‚Р°
+       ============================================================ */
+
+    const AIWorld = {
+        root: null,
+        state: 'portfolio',          // 'portfolio' | 'aiw'
+        scrollY: 0,
+        transitioning: false,
+        idleTimelines: [],
+        viewers: [],
+
+        init() {
+            this.root = $('#aiw-root');
+            if (!this.root) return;
+
+            this.bindLangToggle();
+            this.stabilizeTextZones();
+            this.applyLang("ru");   // дефолт: русский
+            AIWPortal.init();
+            this.buildNetwork();
+            this.bindExit();
+
+            // РіР»СѓР±РѕРєР°СЏ СЃСЃС‹Р»РєР° РѕРїС†РёРѕРЅР°Р»СЊРЅР°: #aiw
+            if (location.hash === '#aiw') {
+                this.enterInstant();
+            }
+        },
+
+        enterInstant() {
+            this.captureScroll();
+            this.setState('aiw');
+            if (window.VideoNetwork) window.VideoNetwork.start();
+        },
+
+        /* ---------- Video Network: Р¶РёРІС‹Рµ СѓР·Р»С‹ M1..M4 ---------- */
+        /* ---------- RU/ENG: капсула-переключатель ---------- */
+
+
+        /* ---------- ЛОКАЛИЗАЦИЯ RU/ENG второго мира ---------- */
+
+        /* ---------- TITLE ZONE ghosts: language-independent geometry ----------
+           Each ghost is an invisible clone of the initial (RU, longest)
+           markup text. It reserves the exact height of .aiw-sub and the
+           exact width of the Back button. applyLang() then repaints only
+           the live text on top — layout never moves on RUS <-> ENG. */
+
+        stabilizeTextZones() {
+            ["aiw-sub", "aiw-exit-text"].forEach(id => {
+                const live = document.getElementById(id);
+                if (!live || !live.parentNode) return;
+                const host = live.parentNode;
+                if (host.querySelector(":scope > .aiw-ghost")) return;
+                const ghost = document.createElement("span");
+                ghost.className = "aiw-ghost";
+                ghost.setAttribute("aria-hidden", "true");
+                ghost.textContent = live.textContent;
+                host.insertBefore(ghost, live);
+            });
+        },
+
+        applyLang(lang) {
+            this.lang = lang === "en" ? "en" : "ru";
+            const en = this.lang === "en";
+
+            const dict = {
+                "aiw-sub": en
+                    ? "Commercial AI films & stories, created by a human for humans."
+                    : "Коммерческие мультфильмы и истории, созданные человеком с помощью ИИ — для людей.",
+                "aiw-exit-text": en ? "Back to Portfolio" : "Вернуться в портфолио"
+            };
+            Object.keys(dict).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = dict[id];
+            });
+
+        },
+
+
+        bindLangToggle() {
+            const lang = $(".aiw-lang", this.root);
+            const hit = document.getElementById("aiw-lang-toggle");
+            if (!lang || !hit) return;
+
+            hit.addEventListener("click", () => {
+                const isEng = lang.classList.toggle("aiw-eng");
+                this.applyLang(isEng ? "en" : "ru");
+                try {
+                    window.dispatchEvent(new CustomEvent("aiw-lang", { detail: { lang: this.lang } }));
+                } catch (e) { /* старые браузеры без CustomEvent — ок */ }
+            });
+        },
+
+
+        buildNetwork() {
+            // РґРµР»РµРіРёСЂСѓРµРј РїРѕСЃС‚СЂРѕРµРЅРёРµ Рё РёРЅС‚РµСЂР°РєС‚РёРІ РјРѕРґСѓР»СЋ video-network.js
+            if (typeof window.VideoNetwork !== 'undefined') {
+                window.VideoNetwork.init(this.root);
+            }
+        },
+
+        bindShellHover(shell) {
+            const video = $('.aiw-video', shell);
+            let loadPromise = null;
+
+            const ensureSource = () => {
+                if (!video.querySelector('source')) {
+                    const s = document.createElement('source');
+                    s.src = shell.dataset.aiwVideo;
+                    s.type = 'video/mp4';
+                    video.appendChild(s);
+                    video.load();
+                }
+            };
+
+            const play = () => {
+                if (prefersReducedMotion()) return;
+                ensureSource();
+                loadPromise = video.play();
+                if (loadPromise && loadPromise.catch) loadPromise.catch(() => {});
+                shell.classList.add('aiw-playing');
+            };
+
+            const pause = () => {
+                if (!shell.classList.contains('aiw-playing')) return;
+                video.pause();
+                shell.classList.remove('aiw-playing');
+            };
+
+            shell.addEventListener('mouseenter', play);
+            shell.addEventListener('mouseleave', pause);
+
+            // РјРѕР±РёР»СЊРЅС‹Рµ: С‚Р°Рї РїРѕ РѕР±РѕР»РѕС‡РєРµ СЃРЅР°С‡Р°Р»Р° В«РїСЂРѕР±СѓРµС‚В» РІРёРґРµРѕ
+            shell.addEventListener('touchstart', () => {
+                if (!prefersReducedMotion()) ensureSource();
+            }, { passive: true });
+        },
+
+        bindShellOpen(shell, w) {
+            shell.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (this.state !== 'aiw') return; // РѕР±РѕР»РѕС‡РєРё Р°РєС‚РёРІРЅС‹ С‚РѕР»СЊРєРѕ РІ AI World
+                AIWViewer.open(w, shell);
+            });
+            shell.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    AIWViewer.open(w, shell);
+                }
+            });
+        },
+
+        /* ---------- idle movement (Р»С‘РіРєРѕРµ РґС‹С…Р°РЅРёРµ РѕР±РѕР»РѕС‡РµРє) ---------- */
+
+        initIdleMovement() {
+            if (prefersReducedMotion() || !gsapOK()) return;
+
+            $$('.aiw-shell', this.root).forEach((shell, i) => {
+                // РґС‹С€РёС‚ РІРЅСѓС‚СЂРµРЅРЅСЏСЏ В«РїР»С‘РЅРєР°В» РѕР±РѕР»РѕС‡РєРё, РІРЅРµС€РЅСЏСЏ вЂ” РїРѕРґ parallax
+                const media = $('.aiw-media', shell);
+                const tl = gsap.timeline({ repeat: -1, yoyo: true });
+                tl.to(media, {
+                    y: (i % 2 ? -1 : 1) * (6 + (i % 3) * 3),
+                    x: (i % 3 ? -1 : 1) * 5,
+                    rotation: (i % 2 ? 1 : -1) * 1.2,
+                    duration: 4 + (i % 4),
+                    ease: 'sine.inOut'
+                });
+                this.idleTimelines.push(tl);
+            });
+        },
+
+        /* ---------- parallax РЅР° РєСѓСЂСЃРѕСЂ ---------- */
+
+        initParallax() {
+            if (prefersReducedMotion() || isMobile() || !gsapOK()) return;
+
+            // СЃРјРµС‰Р°РµРј cell-СЃР»РѕР№ С‡РµСЂРµР· CSS-РїРµСЂРµРјРµРЅРЅС‹Рµ:
+            // GSAP-С‚СЂР°РЅСЃС„РѕСЂРјС‹ РѕР±РѕР»РѕС‡РµРє РѕСЃС‚Р°СЋС‚СЃСЏ РЅРµС‚СЂРѕРЅСѓС‚С‹РјРё
+            const cells = $$('.aiw-cell', this.root);
+            const state = { x: 0, y: 0 };
+
+            const onMove = (e) => {
+                state.x = (e.clientX / window.innerWidth - 0.5);
+                state.y = (e.clientY / window.innerHeight - 0.5);
+            };
+
+            const ticker = () => {
+                cells.forEach((s, i) => {
+                    const depth = 8 + (i % 3) * 7;
+                    s.style.setProperty('--aiw-tx', (-state.x * depth).toFixed(1) + 'px');
+                    s.style.setProperty('--aiw-ty', (-state.y * depth).toFixed(1) + 'px');
+                });
+            };
+
+            window.addEventListener('mousemove', onMove, { passive: true });
+            gsap.ticker.add(ticker);
+            this._parallaxCleanup = () => {
+                window.removeEventListener('mousemove', onMove);
+                gsap.ticker.remove(ticker);
+            };
+        },
+
+        /* ---------- РІС‹С…РѕРґ РёР· AI World ---------- */
+
+        bindExit() {
+            const exit = $('.aiw-exit', this.root);
+            if (exit) exit.addEventListener('click', () => this.exit());
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && this.state === 'aiw' && !AIWViewer.isOpen) {
+                    this.exit();
+                }
+            });
+        },
+
+        captureScroll() {
+            this.scrollY = window.scrollY || document.documentElement.scrollTop;
+        },
+
+        restoreScroll() {
+            window.scrollTo(0, this.scrollY);
+        },
+
+        setState(next) {
+            this.state = next;
+
+            /* Accessibility: перед скрытием мира (W2 → W1) снять focus
+               с элементов внутри #aiw-root, иначе браузер блокирует
+               aria-hidden на предке сфокусированного элемента (a11y warning).
+               После возврата аккуратно вернуть focus на портал входа. */
+            if (next === 'portfolio') {
+                const active = document.activeElement;
+                if (active && this.root.contains(active)) {
+                    active.blur();
+                }
+            }
+
+            this.root.setAttribute('aria-hidden', next === 'aiw' ? 'false' : 'true');
+
+            this.root.classList.toggle('aiw-active', next === 'aiw');
+            document.body.classList.toggle('aiw-open', next === 'aiw');
+        },
+
+        /* ---------- РїРµСЂРµС…РѕРґС‹ СЃРѕСЃС‚РѕСЏРЅРёР№ ---------- */
+
+        enter() {
+            if (this.state !== 'portfolio' || this.transitioning) return;
+            this.transitioning = true;
+            this.captureScroll();
+            // С„РёРєСЃРёСЂСѓРµРј СЃРєСЂРѕР»Р» СЃСЂР°Р·Сѓ вЂ” СЃС‚СЂР°РЅРёС†Р° РЅРµ В«РїСЂС‹РіРЅРµС‚В» РїСЂРё РїРѕРіР»РѕС‰РµРЅРёРё
+            document.body.style.overflow = 'hidden';
+
+            const afterAbsorb = () => {
+                AIWPortal.collapse(() => {
+                    this.setState('aiw');
+                    this.revealWorld(() => {
+                        AIWPortal.bloom(() => {
+                            // СЃРєСЂРѕР»Р» СѓР¶Рµ Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ, AI World СЃРєСЂРѕР»Р»РёС‚СЃСЏ РІРЅСѓС‚СЂРё root
+                            this.root.scrollTop = 0;
+                            this.transitioning = false;
+                        });
+                    });
+                });
+            };
+
+            // РµСЃР»Рё РїРµСЂРµС…РѕРґ СЃРѕСЂРІР°Р»СЃСЏ РЅР° Р»СЋР±РѕР№ С„Р°Р·Рµ вЂ” С‡РµСЂРµР· 6СЃ СЂР°Р·Р±Р»РѕРєРёСЂСѓРµРј
+            setTimeout(() => { this.transitioning = false; }, 6000);
+
+            AIWPortal.absorb(afterAbsorb);
+        },
+
+        revealWorld(onDone) {
+            if (!gsapOK() || prefersReducedMotion()) {
+                this.root.scrollTop = 0;
+                setTimeout(onDone, 250);
+                return;
+            }
+
+            const header = $('.aiw-header', this.root);
+            const nodes = $$('.vn-cell', this.root);
+
+            this.root.scrollTop = 0;
+
+            let finished = false;
+            const done = () => {
+                if (finished) return;
+                finished = true;
+                // РґРѕ-РїРѕРєР°Р·С‹РІР°РµРј РєРѕРЅС‚РµРЅС‚ РЅР°РїСЂСЏРјСѓСЋ С‡РµСЂРµР· CSS (РјРіРЅРѕРІРµРЅРЅРѕ,
+                // РЅРµ Р·Р°РІРёСЃРёС‚ РѕС‚ GSAP-С‚РёРєРµСЂР° вЂ” РІР°Р¶РЅРѕ РґР»СЏ Р·Р°РјРѕСЂРѕР¶РµРЅРЅРѕРіРѕ rAF)
+                if (gsapOK()) gsap.killTweensOf([header, ...nodes]);
+                [header, ...nodes].forEach(el => {
+                    if (!el) return;
+                    el.style.opacity = '1';
+                    el.style.transform = '';
+                    el.style.filter = '';
+                });
+                onDone();
+            };
+
+            const tl = gsap.timeline({ onComplete: done });
+            setTimeout(done, 2600); // СЃС‚СЂР°С…РѕРІРєР° РѕС‚ Р·Р°РјРѕСЂРѕР¶РµРЅРЅРѕРіРѕ rAF
+
+            if (header) {
+                tl.fromTo(header,
+                    { opacity: 0, y: 40 },
+                    { opacity: 1, y: 0, rotation: 0, duration: 0.8, ease: 'power3.out' }
+                );
+            }
+            nodes.forEach((s, i) => {
+                /* INITIAL ROTATION FIX: твин ранее анимировал .vn-cell к
+                   rotation: 0 через inline-transform, перекрывая сохранённый
+                   в CSS поворот композиции (Layout Editor) — видео входили
+                   «ровными» и щёлкались к финальным углам только в done(),
+                   когда inline снимался. Теперь старт/финиш твина = финальный
+                   угол, прочитанный из CSS (DOMMatrix), вход идёт от
+                   finalRot ± 2° к finalRot — inline совпадает с CSS на всём
+                   протяжении, скачка нет. */
+                let finalRot = 0;
+                const tr = getComputedStyle(s).transform;
+                if (tr && tr !== 'none') {
+                    try {
+                        const m = new DOMMatrixReadOnly(tr);
+                        finalRot = Math.atan2(m.b, m.a) * 180 / Math.PI;
+                    } catch (e) { /* без DOMMatrix — 0, как раньше */ }
+                }
+                const swing = (i % 2 ? 1 : -1) * 2;
+                tl.fromTo(s,
+                    { opacity: 0, y: 60, scale: 0.94, rotation: finalRot + swing, x: 0 },
+                    { opacity: 1, y: 0, scale: 1, rotation: finalRot, x: 0, duration: 1.0, ease: 'power3.out' },
+                    i === 0 ? '-=0.55' : '-=0.75'
+                );
+            });
+
+            // СЃРµС‚СЊ РѕР¶РёРІР°РµС‚: РїСЂРѕРІРѕРґР° + РїСѓР»СЊСЃС‹ + hover-РјРµС…Р°РЅРёРєР°
+            if (window.VideoNetwork) window.VideoNetwork.start();
+        },
+
+        exit() {
+            if (this.state !== 'aiw' || this.transitioning) return;
+            this.transitioning = true;
+            AIWViewer.forceClose();
+
+            // РѕСЃС‚Р°РЅР°РІР»РёРІР°РµРј idle-РґРІРёР¶РµРЅРёРµ РЅР° РІСЂРµРјСЏ РѕР±СЂР°С‚РЅРѕРіРѕ РїРѕСЂС‚Р°Р»Р°
+            this.idleTimelines.forEach(tl => tl.pause());
+            // РіР°СЃРёРј Video Network: РІРёРґРµРѕ РЅР° РїР°СѓР·Сѓ, РёРјРїСѓР»СЊСЃС‹ РїСЂРѕС‡СЊ
+            if (window.VideoNetwork) window.VideoNetwork.stop();
+
+            const afterAbsorb = () => {
+                AIWPortal.collapseDark(() => {
+                    this.setState('portfolio');
+                    // РїРѕР»РЅС‹Р№ СЃР±СЂРѕСЃ inline-СЃС‚РёР»РµР№ (layout РїРѕСЂС‚С„РѕР»РёРѕ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅ),
+                    this.resetInterface();
+
+                    // Р—РђР•Р РљРђР›Р¬РќР«Р™ Р’Р«РҐРћР”: РёРЅС‚РµСЂС„РµР№СЃ Рё РїРѕСЂС‚Р°Р» РІС‹Р»РµС‚Р°СЋС‚ РёР· С†РµРЅС‚СЂР°
+                    // РІРјРµСЃС‚Рµ СЃ РѕС‚СЃС‚СѓРїР»РµРЅРёРµРј С‚С‘РјРЅРѕР№ РІСѓР°Р»Рё
+                    try {
+                    AIWPortal.emerge(() => {
+                        // РІСѓР°Р»СЊ РѕС‚СЃС‚СѓРїР°РµС‚ РџРћРЎР›Р• С‚РѕРіРѕ, РєР°Рє СЌР»РµРјРµРЅС‚С‹ Р·Р°РЅСЏР»Рё РјРµСЃС‚Р°
+                        AIWPortal.bloomDark(() => {
+                        // СЃРЅР°С‡Р°Р»Р° СЂР°Р·Р±Р»РѕРєРёСЂСѓРµРј СЃРєСЂРѕР»Р» (layout СѓР¶Рµ С„РёРЅР°Р»СЊРЅС‹Р№),
+                        // Р·Р°С‚РµРј РІРѕСЃСЃС‚Р°РЅР°РІР»РёРІР°РµРј РїРѕР·РёС†РёСЋ
+                        document.body.style.overflow = '';
+                        this.restoreScroll();
+                        requestAnimationFrame(() => this.restoreScroll());
+                        setTimeout(() => this.restoreScroll(), 80); // РіР°СЂР°РЅС‚РёСЏ
+                        this.idleTimelines.forEach(tl => tl.resume());
+                        this.transitioning = false;
+                        });
+                    });
+                    } catch (e) {
+                        // СЃС‚СЂР°С…РѕРІРєР°: РґР°Р¶Рµ РµСЃР»Рё emerge СѓРїР°Р» вЂ” Р·Р°РІРµСЂС€Р°РµРј РІС‹С…РѕРґ С‡РёСЃС‚Рѕ
+                        AIWPortal.bloomDark(() => {
+                            document.body.style.overflow = '';
+                            this.restoreScroll();
+                            this.idleTimelines.forEach(tl => tl.resume());
+                            this.transitioning = false;
+                        });
+                    }
+                });
+            };
+
+            setTimeout(() => { this.transitioning = false; }, 6000);
+
+            AIWPortal.absorbWorld(afterAbsorb);
+        },
+
+        resetInterface() {
+            // РїСЂСЏРјРѕР№ СЃР±СЂРѕСЃ CSS вЂ” РјРіРЅРѕРІРµРЅРЅРѕ, РЅРµР·Р°РІРёСЃРёРјРѕ РѕС‚ GSAP-С‚РёРєРµСЂР°.
+            // РЎРёРјРјРµС‚СЂРёС‡РЅРѕ absorb(): РєР°Р¶РґРѕРµ СЃРІРѕР№СЃС‚РІРѕ, РєРѕС‚РѕСЂРѕРµ РїРѕРіР»РѕС‰РµРЅРёРµ
+            // С‚СЂРѕРіР°РµС‚, Р·РґРµСЃСЊ РІРѕР·РІСЂР°С‰Р°РµС‚СЃСЏ Рє РёСЃС…РѕРґРЅРѕРјСѓ Р·РЅР°С‡РµРЅРёСЋ.
+            const targets = AIWPortal.prey()
+                .concat(AIWPortal.preyExtra())
+                .concat($$('.aiw-portal-trigger'))
+                .concat($$('.aiw-portal-core'))
+                /* LIFECYCLE FIX: селектор был записан без $$ — comma-оператор
+                   возвращал this.root, поэтому .aiw-header и .vn-cell НИКОГДА
+                   не очищались от opacity:0/visibility:hidden, оставленных
+                   absorbWorld() — второй вход в W2 был пустым экраном. */
+                .concat($$('.aiw-header, .aiw-shell, .aiw-cell, .aiw-media, .vn-cell, .vn-node, .vn-video', this.root));
+
+            // СѓРЅРёРєР°Р»СЊРЅС‹Рµ СЌР»РµРјРµРЅС‚С‹ (trigger РІСЃС‚СЂРµС‡Р°РµС‚СЃСЏ Рё РІ prey, Рё РІ preyExtra)
+            const uniq = targets.filter((el, i) => el && targets.indexOf(el) === i);
+
+            uniq.forEach(el => {
+                el.style.opacity = '';
+                el.style.transform = '';
+                el.style.filter = '';
+                el.style.visibility = '';
+                el.style.borderColor = '';
+                el.style.boxShadow = '';
+            });
+
+            // РєРѕР»СЊС†Р° РІРѕСЂРѕРЅРєРё: СѓР±РёСЂР°РµРј РЅР°РєРѕРїР»РµРЅРЅС‹Р№ inline-transform,
+            // Рё РїРµСЂРµР·Р°РїСѓСЃРєР°РµРј Р±РµСЃРєРѕРЅРµС‡РЅРѕРµ РІСЂР°С‰РµРЅРёРµ
+            $$('.aiw-portal-ring').forEach(r => { r.style.transform = ''; });
+            AIWPortal.spinRings();
+
+            // gravity: СЃРЅСЏС‚СЊ hover-РїСЂРёС‚СЏР¶РµРЅРёРµ Рё РІРµСЂРЅСѓС‚СЊ РѕРєРЅРѕ РІ РїРѕРєРѕР№
+            $$('.aiw-gravity').forEach(el => el.classList.remove('aiw-gravity'));
+            if (AIWPortal._window) {
+                AIWPortal._window.targetHover = 0;
+                AIWPortal._window.mx = 0;
+                AIWPortal._window.my = 0;
+            }
+
+            // parallax-РїРµСЂРµРјРµРЅРЅС‹Рµ cell-СЃР»РѕС‘РІ: РІРѕР·РІСЂР°С‚ Рє РЅСѓР»СЋ
+            // parallax-переменные cell-слоёв: возврат к нулю (в т.ч. vn-cell)
+            /* LIFECYCLE FIX: тот же comma-баг — this.root не имеет .forEach,
+               исключение обрывало resetInterface и весь выход (emerge/bloomDark
+               не запускались, First World оставался «вспышкой» без transition). */
+            $$('.aiw-cell, .vn-cell', this.root).forEach(cel => {
+                cel.style.setProperty('--aiw-ty', '0px');
+                cel.style.transform = '';
+            });
+
+            if (gsapOK()) {
+                gsap.killTweensOf(uniq);
+                gsap.killTweensOf($$('.aiw-portal-core'));
+                document.body.style.backgroundColor = '';
+            }
+        }
+    };
+
+    /* СЂР°СЃС€РёСЂРµРЅРёРµ РїРѕСЂС‚Р°Р»Р°: РїРѕРіР»РѕС‰РµРЅРёРµ Р±РµР»РѕРіРѕ РјРёСЂР° */
+    AIWPortal.absorbWorld = function (onDone) {
+        const root = AIWorld.root;
+        const c = this.center();
+        const shells = $$('.vn-cell', root);   // canvas: узлы нового мира
+        const header = $('.aiw-header', root);
+
+        if (!gsapOK() || prefersReducedMotion()) {
+            setTimeout(onDone, 300);
+
+            return;
+        }
+        // MOBILE: элементы в потоке скролла, центр экрана далеко —
+        // гигантские dx/dy уносили подложки. Поглощение = мягкий fade+scale.
+        if (isMobile()) {
+            gsap.to("body", {
+                backgroundColor: "#f0e9dd",
+                duration: 0.9,
+                ease: "power2.in"
+            });
+            const fade = [header].concat(shells).filter(Boolean);
+            fade.forEach((el, i) => {
+                gsap.fromTo(el, {
+                    x: 0, y: 0, scale: 1, rotation: 0, opacity: 1
+                }, {
+                    scale: 0.6,
+                    opacity: 0,
+                    filter: "blur(8px)",
+                    duration: 0.7,
+                    delay: i * 0.04,
+                    ease: "power2.in"
+                });
+            });
+            setTimeout(() => {
+                fade.forEach(el => { el.style.opacity = "0"; el.style.visibility = "hidden"; });
+                onDone();
+            }, 1000);
+            return;
+        }
+
+
+        // СЃР±СЂРѕСЃ РѕСЃС‚Р°С‚РѕС‡РЅС‹С… СЃС‚РёР»РµР№ РѕС‚ РїСЂРѕС€Р»РѕРіРѕ РїРµСЂРµС…РѕРґР°
+        shells.concat([header]).forEach(el => {
+            if (!el) return;
+            el.style.opacity = '';
+            el.style.visibility = '';
+            el.style.transform = '';
+            el.style.filter = '';
+        });
+
+        gsap.to('body', {
+            backgroundColor: '#f0e9dd',
+            duration: 0.9,
+            ease: 'power2.in'
+        });
+
+        const all = [header].concat(shells).filter(Boolean);
+        all.forEach((el, i) => {
+            const r = el.getBoundingClientRect();
+            const dx = c.x - (r.left + r.width / 2);
+            const dy = c.y - (r.top + r.height / 2);
+            const dist = Math.hypot(dx, dy);
+
+            gsap.fromTo(el, {
+                // РґРµС‚РµСЂРјРёРЅРёСЂРѕРІР°РЅРЅС‹Р№ СЃС‚Р°СЂС‚: Р±РµР· РєРµС€Р° РїСЂРѕС€Р»РѕРіРѕ С†РёРєР»Р°
+                x: 0, y: 0, scale: 1, rotation: 0, opacity: 1
+            }, {
+                x: dx * 0.92,
+                y: dy * 0.92,
+                scale: 0.02,
+                rotation: (i % 2 ? 1 : -1) * (14 + dist * 0.01),
+                opacity: 0,
+                filter: 'blur(12px)',
+                duration: 1.0,
+                delay: i * 0.05,
+                ease: 'power3.in',
+                force3D: true
+            });
+        });
+
+        setTimeout(() => {
+            // РґСѓР±Р»РёСЂСѓРµРј СЃРєСЂС‹С‚РёРµ РїСЂСЏРјС‹Рј CSS (РЅРµ Р·Р°РІРёСЃРёС‚ РѕС‚ GSAP-С‚РёРєРµСЂР°)
+            all.forEach(el => { el.style.opacity = '0'; el.style.visibility = 'hidden'; });
+            onDone();
+        }, 1300);
+    };
+
+    /* ============================================================
+       FULLSCREEN CINEMATIC VIEWER
+       ============================================================ */
+
+    const AIWViewer = {
+        el: null,
+        stage: null,
+        videoEl: null,
+        isOpen: false,
+        originShell: null,
+        current: null,
+
+        ensure() {
+            if (this.el) return;
+
+            this.el = document.createElement('div');
+            this.el.className = 'aiw-viewer';
+            this.el.innerHTML = `
+                <div class="aiw-viewer-stage">
+                    <div class="aiw-viewer-close" role="button" tabindex="0"
+                         aria-label="Close">
+                        <span>Close</span>
+                    </div>
+                    <div class="aiw-viewer-fs" role="button" tabindex="0"
+                         aria-label="Fullscreen">
+                        <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span>Fullscreen</span>
+                    </div>
+                    <video class="aiw-viewer-video" muted loop playsinline controls></video>
+                    <div class="aiw-viewer-bar">
+                        <div>
+                            <div class="aiw-viewer-name"></div>
+                            <div class="aiw-viewer-tag"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(this.el);
+
+            this.stage = $('.aiw-viewer-stage', this.el);
+            this.videoEl = $('.aiw-viewer-video', this.el);
+            this.nameEl = $('.aiw-viewer-name', this.el);
+            this.tagEl = $('.aiw-viewer-tag', this.el);
+
+            $('.aiw-viewer-close', this.el).addEventListener('click', () => this.close());
+            $('.aiw-viewer-close', this.el).addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    this.close();
+                }
+            });
+
+            /* NATIVE FULLSCREEN: РІРёРґРµРѕ РІРѕ РІРµСЃСЊ СЌРєСЂР°РЅ. РљРЅРѕРїРєР° РёР»Рё РґР°Р±Р»-РєР»РёРє. */
+            const fsBtn = $('.aiw-viewer-fs', this.el);
+            const goFullscreen = () => {
+                const v = this.videoEl;
+                if (!v) return;
+                const p = v.requestFullscreen || v.webkitRequestFullscreen || v.msRequestFullscreen;
+                if (p) {
+                    p.call(v).catch && p.call(v).catch(() => {});
+                }
+            };
+            if (fsBtn) {
+                fsBtn.addEventListener('click', (e) => { e.stopPropagation(); goFullscreen(); });
+                fsBtn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goFullscreen(); }
+                });
+            }
+            // РґРІРѕР№РЅРѕР№ РєР»РёРє РїРѕ РІРёРґРµРѕ вЂ” С‚РѕР¶Рµ fullscreen (СЃС‚Р°РЅРґР°СЂС‚ UX РїР»РµРµСЂРѕРІ)
+            this.videoEl.addEventListener('dblclick', goFullscreen);
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && this.isOpen) this.close();
+            });
+
+            // РєР»РёРє РїРѕ С„РѕРЅСѓ Р·Р°РєСЂС‹РІР°РµС‚
+            this.el.addEventListener('click', (e) => {
+                if (e.target === this.el) this.close();
+            });
+        },
+
+        open(work, originShell) {
+            this.ensure();
+            if (this.isOpen) return;
+
+            this.isOpen = true;
+            this.current = work;
+            this.originShell = originShell;
+
+            this.nameEl.textContent = work.name;
+            this.tagEl.textContent = work.tag;
+
+            const s = document.createElement('source');
+            s.src = work.video;
+            s.type = 'video/mp4';
+            this.videoEl.innerHTML = '';
+            this.videoEl.appendChild(s);
+            this.videoEl.load();
+
+            /* AUDIO: клик пользователя открывает viewer со звуком.
+               Порядок строго: muted -> volume -> play(). open()
+               вызывается из click-хендлера узла (user gesture),
+               поэтому браузер разрешает звуковое воспроизведение.
+               volume фиксирован: 0.35 (35%). */
+            this.videoEl.muted = false;
+            this.videoEl.volume = 0.35;
+
+            this.el.classList.add('aiw-open');
+            document.body.style.overflow = 'hidden';
+
+            const playPromise = this.videoEl.play();
+            if (playPromise && playPromise.catch) playPromise.catch(() => {});
+
+            if (!gsapOK() || prefersReducedMotion()) return;
+
+            // cinematic: viewer РІС‹СЂР°СЃС‚Р°РµС‚ РёР· РёСЃС…РѕРґРЅРѕР№ РѕР±РѕР»РѕС‡РєРё
+            const from = originShell.getBoundingClientRect();
+            const to = this.stage.getBoundingClientRect();
+
+            const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+            const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+            const sx = from.width / to.width;
+            const sy = from.height / to.height;
+
+            gsap.fromTo(this.stage,
+                {
+                    x: dx, y: dy,
+                    scaleX: sx, scaleY: sy,
+                    borderRadius: 140,
+                    opacity: 0.6
+                },
+                {
+                    x: 0, y: 0,
+                    scaleX: 1, scaleY: 1,
+                    borderRadius: 28,
+                    opacity: 1,
+                    duration: 0.85,
+                    ease: 'expo.out',
+                    clearProps: 'transform'
+                }
+            );
+
+            if (originShell) gsap.to(originShell, { opacity: 0.35, duration: 0.4 });
+        },
+
+        close() {
+            if (!this.isOpen) return;
+            this.forceClose(this.originShell);
+        },
+
+        forceClose() {
+            if (!this.isOpen) return;
+
+            const shell = this.originShell;
+            const stage = this.stage;
+            this.isOpen = false;
+            this.originShell = null;
+
+            this.videoEl.pause();
+
+            if (!gsapOK() || prefersReducedMotion() || !shell) {
+                this.el.classList.remove('aiw-open');
+                document.body.style.overflow = 'hidden'; // AI World РґРµСЂР¶РёС‚ Р±Р»РѕРєРёСЂРѕРІРєСѓ
+                if (shell) gsap.set(shell, { clearProps: 'opacity' });
+                return;
+            }
+
+            // РІРѕР·РІСЂР°С‰Р°РµРј СЂР°Р±РѕС‚Сѓ РІ РёСЃС…РѕРґРЅСѓСЋ РѕР±РѕР»РѕС‡РєСѓ
+            let finished = false;
+            const once = (fn) => () => { if (finished) return; finished = true; fn(); };
+
+            const from = shell.getBoundingClientRect();
+            const to = stage.getBoundingClientRect();
+            const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+            const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+            const sx = from.width / to.width;
+            const sy = from.height / to.height;
+
+            gsap.to(stage, {
+                x: dx, y: dy,
+                scaleX: sx, scaleY: sy,
+                borderRadius: 140,
+                opacity: 0,
+                duration: 0.7,
+                ease: 'power3.inOut',
+                onComplete: once(() => {
+                    this.el.classList.remove('aiw-open');
+                    gsap.set(stage, { clearProps: 'all' });
+                    document.body.style.overflow = 'hidden'; // AI World РґРµСЂР¶РёС‚ Р±Р»РѕРєРёСЂРѕРІРєСѓ
+                })
+            });
+            setTimeout(once(() => {
+                this.el.classList.remove('aiw-open');
+                gsap.set(stage, { clearProps: 'all' });
+                document.body.style.overflow = 'hidden';
+            }), 1200);
+
+            gsap.to(shell, { opacity: 1, duration: 0.4, delay: 0.2 });
+        }
+    };
+
+    /* ---------- СЌРєСЃРїРѕСЂС‚ Рё Р°РІС‚РѕР·Р°РїСѓСЃРє ---------- */
+
+    window.AIWPortal = AIWPortal;
+    window.AIWorld = AIWorld;
+    window.AIWViewer = AIWViewer;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => AIWorld.init());
+    } else {
+        AIWorld.init();
+    }
+
+    // РїСѓР±Р»РёС‡РЅС‹Р№ С‚СЂРёРіРіРµСЂ вЂ” РІС‹Р·С‹РІР°РµС‚СЃСЏ РєРЅРѕРїРєРѕР№-РІРѕСЂРѕРЅРєРѕР№
+    window.openAIWorld = function () {
+        AIWorld.enter();
+    };
+})();

@@ -1,0 +1,1090 @@
+﻿/* ============================================================
+   AI WORLD вЂ” РёР·РѕР»РёСЂРѕРІР°РЅРЅС‹Р№ РјРѕРґСѓР»СЊ. Р’СЃРµ РєР»Р°СЃСЃС‹ СЃ РїСЂРµС„РёРєСЃРѕРј .aiw-
+   РќРµ Р·Р°РІРёСЃРёС‚ РѕС‚ CSS РѕСЃРЅРѕРІРЅРѕРіРѕ РїРѕСЂС‚С„РѕР»РёРѕ Рё РЅРµ РІР»РёСЏРµС‚ РЅР° РЅРµРіРѕ.
+   ============================================================ */
+
+.aiw-root,
+.aiw-root *,
+.aiw-root *::before,
+.aiw-root *::after {
+    box-sizing: border-box;
+}
+
+.aiw-root {
+    /* DARK TAUPE / WARM GRAPHITE: матовое каменное пространство.
+       Светлый-глубокий-тёмный одновременно: большая матовая поверхность,
+       в которой есть воздух и глубина, — не фон-цвет, а фон-пространство. */
+    --aiw-bg: #393B38;
+    --aiw-bg-deep: #252724;
+    --aiw-ink: #e8e6e2;
+    --aiw-ink-soft: #a8a49e;
+    --aiw-accent: #d6d2cc;
+    --aiw-accent-soft: rgba(214, 210, 204, 0.2);
+    --aiw-shell: #2E302D;
+    --aiw-shadow: 0 35px 100px -45px rgba(0, 0, 0, 0.65);
+    --aiw-radius-blob: 58% 42% 55% 45% / 48% 55% 45% 52%;
+
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+
+    /* матовая поверхность с очень мягкой глубиной: не «градиент»,
+       а ощущение большой каменной плоскости, освещённой сверху-слева */
+    background-color: var(--aiw-bg-deep);
+    background-image:
+        /* фон темнее видео: свет в сцене исходит от самих видео */
+        radial-gradient(85% 75% at 30% 18%,
+            #3E403C 0%, #333532 35%, #292B28 65%, #212321 100%);
+    color: var(--aiw-ink);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.aiw-root.aiw-active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+/* AMBIENT: освещение пространства — почти невидимое.
+   Три очень мягких зоны (M2, M4, низ) + vignette по краям.
+   Воспринимается как свет в комнате, а не как градиенты. */
+.aiw-root::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(40% 34% at 50% 26%, rgba(232, 230, 226, 0.035) 0%, transparent 70%),
+        radial-gradient(34% 30% at 72% 78%, rgba(232, 230, 226, 0.028) 0%, transparent 70%),
+        radial-gradient(30% 26% at 40% 88%, rgba(232, 230, 226, 0.022) 0%, transparent 70%),
+        radial-gradient(140% 120% at 50% 50%, transparent 60%, rgba(15, 16, 14, 0.28) 100%);
+}
+
+/* FILM GRAIN: едва заметное зерно поверх — матовость плёнки.
+   Статичный SVG-noise, opacity 0.03: не текстура, а воздух. */
+.aiw-root::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+}
+
+/* Р±Р»РѕРєРёСЂРѕРІРєР° СЃРєСЂРѕР»Р»Р° РѕСЃРЅРѕРІРЅРѕРіРѕ РґРѕРєСѓРјРµРЅС‚Р°, РїРѕРєР° РѕС‚РєСЂС‹С‚ AI World */
+body.aiw-open {
+    overflow: hidden !important;
+}
+
+.aiw-root ::selection {
+    background: var(--aiw-accent-soft);
+}
+
+/* ============================================================
+   SECOND WORLD — THE CANVAS.
+   Одна огромная живая композиция ~3000x1800, физически БОЛЬШЕ
+   viewport. Видео — фрагменты картины: крупные, перекрывающиеся,
+   частично за краями экрана. Пользователь исследует полотно:
+   позиция курсора = плавное панорамирование, hover = фокус
+   фрагмента (zoom + затемнение остальных), scroll = вертикальный
+   проезд по картине. Ощущение: экран — окно в нечто большее.
+   ============================================================ */
+
+.vn-field {
+    /* FLOW SCROLL: сцена — обычный блок в потоке документа.
+       Desktop-позиции видео — в блоке (min-width: 769px) ниже. */
+    position: relative;
+    width: 100%;
+    cursor: default;
+    z-index: 1;  /* над фоном aiw-root::before/::after, под шапкой */
+}
+
+/* FLOW SCROLL: сцена — обычный relative-блок, виртуального полотна нет */
+.vn-scene-spin {
+    position: relative;
+    width: 100%;
+    height: 1660px;
+}
+
+.vn-svg { display: none; }  /* провода не возвращаются */
+.vn-wire { display: none; }
+.vn-pulse { display: none; }
+
+/* --- фрагменты картины --- */
+
+.vn-cell {
+    position: absolute;
+}
+
+.vn-node {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    overflow: hidden;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 60px 140px -50px rgba(0, 0, 0, 0.8),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05),
+                inset 0 -30px 60px rgba(0, 0, 0, 0.18);
+    /* фокус:.hover — режиссёрский zoom; остальные фрагменты гаснут
+       через .vn-field.aiw-focus (JS ставит класс при любом hover) */
+    filter: saturate(calc(0.82 + var(--vn-a, 0) * 0.18))
+            brightness(calc(0.62 + var(--vn-a, 0) * 0.38));
+    transform: scale(calc(1 + var(--vn-a, 0) * 0.06));
+    transition: filter 0.9s ease, transform 0.9s cubic-bezier(0.22, 0.61, 0.36, 1),
+                border-color 0.9s ease, box-shadow 0.9s ease;
+    will-change: transform, filter;
+    background: transparent;
+    -webkit-tap-highlight-color: transparent;
+    z-index: 1;
+}
+
+.vn-node:hover,
+.vn-node:focus-visible {
+    border-color: rgba(255, 255, 255, calc(0.12 + var(--vn-a, 0) * 0.08));
+    box-shadow: 0 80px 180px -60px rgba(0, 0, 0, 0.85),
+                inset 0 1px 0 rgba(255, 255, 255, 0.07),
+                inset 0 -30px 60px rgba(0, 0, 0, 0.12);
+    outline: none;
+    z-index: 10;
+}
+
+.vn-video,
+.vn-poster {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+}
+
+.vn-video {
+    /* видео всегда играет; вне фокуса затемнено (0.62),
+       в фокусе — полная яркость: драматургия картины */
+    opacity: calc(0.75 + var(--vn-a, 0) * 0.25);
+}
+
+.vn-poster { display: none; }
+.vn-glow { display: none; }
+
+/* ============================================================
+   КОМПОЗИЦИЯ ПОЛОТНА 3000x1800 (авторская, НЕ сетка):
+   M2 — гигантский вертикальный центр картины (130vh);
+   M1 — средний, частично ПЕРЕКРЫТ M2, наклон;
+   M3 — ниже-лево, наполовину за нижним краем;
+   M4 — нижний фор-план, наклон 8°, треть за правым краем.
+   Порядок слоёв: M3 < M1 < M2 < M4 (перекрытия настоящие).
+   ============================================================ */
+
+/* ============================================================
+   FLOW SCROLL COMPOSITION (desktop >= 769px).
+   Виртуального полотна и камеры нет: сцена — обычный блок в потоке,
+   страница скроллится нативно (wheel = обычный scroll).
+   РАЗМЕРЫ видео — ровно прежние, перемещены только позиции.
+   Система координат: left: calc(50% - N) = привязка к ЦЕНТРУ viewport,
+   поэтому взаимные перекрытия идентичны на любой desktop-ширине.
+   Схема: M2 — центральный вертикальный гигант; M1 — верх-лево,
+   правой частью под M2; M4 — нижний фор-план слева (верхний слой);
+   M3 — низ-право, небольшим выходом за правый край экрана.
+   Верх M3/M4 привязан к низу ПЕРВОГО viewport (100vh - Npx):
+   гарантированный peek ~150-200px при любой высоте экрана.
+   ============================================================ */
+
+@media (min-width: 769px) {
+    .vn-field {
+        margin-left: calc(50% - 50vw);   /* full-bleed: обрезка краями экрана */
+        width: 100vw;
+        overflow-x: clip;                /* выходы за края клиппятся, h-scroll нет */
+    }
+
+    .vn-scene-spin {
+        height: 1660px;                  /* реальная высота: M2 (40+1560) + воздух */
+    }
+
+    /* M2: гигант — главный экран картины */
+.vn-pos-2 {
+    left: calc(50% - 310px);
+    top: 40px;
+    width: 620px;
+    height: 1560px;
+    z-index: 30;
+    border-radius: 24px;
+}
+
+/* M1: верх-лево, правой частью перекрыт M2 (на 200px) */
+.vn-pos-1 {
+    left: calc(50% - 870px);
+    top: 240px;
+    width: 760px;
+    height: 440px;
+    transform: rotate(-1.6deg);
+    z-index: 20;
+}
+
+/* M3: низ-право, небольшим выходом за правый край экрана */
+.vn-pos-3 {
+    left: calc(50% + 250px);
+    top: calc(100vh - 460px);
+    width: 680px;
+    height: 420px;
+    transform: rotate(1.2deg);
+    z-index: 10;
+}
+
+/* M4: нижний фор-план слева, верхний слой */
+.vn-pos-4 {
+    left: calc(50% - 900px);
+    top: calc(100vh - 510px);
+    width: 1250px;
+    height: 640px;
+    transform: rotate(2.2deg);
+    z-index: 40;
+    border-radius: 26px;
+}
+}
+
+/* ============================================================
+   MOBILE (<=768): ВЕРТИКАЛЬНЫЙ СВИТОК.
+   Картина — длинное полотно ~100vw x 4000px, видео идут серией
+   с разной крупностью/наклонами/перекрытиями. Скролл = скольжение
+   по свитку. Перекрытия сохраняются, M2 — кульминация.
+   ============================================================ */
+
+@media (max-width: 768px) {
+    .vn-field {
+        position: static;       /* свиток: сцена в потоке документа */
+        inset: auto;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+        padding: 3vh 0 14vh;   /* first video higher */
+    }
+
+    .vn-scene-spin {
+        position: relative;
+        width: 100%;
+        height: auto;
+        left: auto;
+        top: auto;
+        margin: 0;
+        transform: none; /* свиток скроллится нативно, не камерой */
+        display: flex;       /* order (M1-M3-M2-M4) работает во flex */
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .vn-cell {
+        position: relative;
+        left: auto !important;
+        right: auto !important;
+        top: auto !important;
+        bottom: auto !important;
+        width: 78vw;
+        height: auto;
+        aspect-ratio: 16 / 10;
+        display: block;
+    }
+
+       /* порядок: M1, M3, M2, M4 (M2 и M3 поменяны местами через order);
+       минимальные интервалы: плотный кинематографичный свиток */
+    .vn-pos-1 { width: 78vw; margin-bottom: 6vh; transform: rotate(-0.4deg); order: 1; }
+    .vn-pos-3 { width: 78vw; margin-bottom: 6vh; transform: rotate(0.4deg); order: 2; }
+    .vn-pos-2 {
+        width: 72vw;
+        height: auto;
+        left: auto !important;
+        top: auto !important;
+        aspect-ratio: 9 / 15;
+        margin-bottom: 6vh;
+        transform: rotate(0deg);
+        border-radius: 20px;
+        order: 3;
+    }
+    .vn-pos-4 {
+        width: 88vw;
+        margin-bottom: 6vh;
+        transform: rotate(-0.3deg);
+        order: 4;
+    }
+
+    .vn-node { border-radius: 14px; }
+
+    /* в свитке яркость определяется центром viewport (detectCenter) */
+    .vn-node {
+        filter: saturate(calc(0.85 + var(--vn-a, 0) * 0.15))
+                brightness(calc(0.72 + var(--vn-a, 0) * 0.28));
+    }
+}
+
+/* --- prefers-reduced-motion: полотно статично, доступное --- */
+
+@media (prefers-reduced-motion: reduce) {
+    .vn-node,
+    .vn-video {
+        transition: opacity 0.35s ease !important;
+        animation: none !important;
+        filter: none !important;
+    }
+
+    .vn-scene-spin { transform: none !important; }
+}
+
+.aiw-container {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 48px 28px 120px;
+}
+
+/* широкие экраны: композиция сети использует пространство,
+   иначе 1920+ сжимается в узкую колонку с пустотами по краям */
+@media (min-width: 1600px) {
+    .aiw-container {
+        max-width: min(1560px, 92vw);
+    }
+}
+
+.aiw-header {
+    position: relative;
+    z-index: 20;   /* над fixed-сценой-полотном */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin-bottom: 90px;
+}
+
+.aiw-title {
+    margin: 0;
+    font-size: clamp(40px, 6vw, 76px);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+    color: var(--aiw-ink);
+}
+
+.aiw-title em {
+    font-style: normal;
+    color: var(--aiw-accent);
+}
+
+.aiw-sub {
+    max-width: 460px;
+    margin: 22px 0 0;
+    color: var(--aiw-ink-soft);
+    font-size: 16px;
+    line-height: 1.65;
+}
+
+/* ============================================================
+   TITLE ZONE — language-independent geometry (desktop).
+   The invisible ghost (a clone of the initial RU, longest text)
+   reserves the height of .aiw-sub; the live text is painted on
+   top, absolutely. Ghost is inserted by ai-world.js at init.
+   Desktop-only block: mobile (<=768px) rules stay untouched.
+   ============================================================ */
+
+@media (min-width: 769px) {
+    .aiw-sub {
+        position: relative;      /* positioning context for the live text */
+    }
+
+    .aiw-sub .aiw-ghost {
+        visibility: hidden;
+    }
+
+    .aiw-sub .aiw-live {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+    }
+}
+
+/* --- RU/ENG: капсула-полукруг (iOS-style), кружок съезжает --- */
+
+.aiw-lang {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    width: 86px;
+    height: 38px;
+    border-radius: 19px 19px 19px 19px;   /* капсула */
+    background: rgba(46, 48, 45, 0.75);
+    border: 1px solid rgba(200, 196, 190, 0.22);
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--aiw-ink-soft);
+    user-select: none;
+    cursor: pointer;
+    overflow: hidden;
+    transition: background 0.4s ease;
+}
+
+/* DESKTOP ONLY: языковая капсула стоит НЕПОСРЕДСТВЕННО СЛЕВА от кнопки
+   «Вернуться назад». margin-left: auto в flex-строке шапки прижимает пару
+   [ language switch ][ back button ] к правому краю, заголовок — слева.
+   Расстояние между капсулой и кнопкой задаёт уже существующий gap шапки
+   (18px). Вертикаль не меняется (align-items: center + стабильная
+   title zone). Mobile (<=768px) не затрагивается. */
+
+@media (min-width: 769px) {
+    .aiw-lang {
+        margin-left: auto;
+    }
+}
+
+.aiw-lang-ru,
+.aiw-lang-eng {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: opacity 0.45s ease;
+    z-index: 1;
+}
+
+.aiw-lang-ru  { left: 15px; }
+.aiw-lang-eng { right: 12px; opacity: 0; }
+
+/* кружок: слева (закрывает RU неактивно?) — нет: RU виден слева,
+   кружок справа; при переключении кружок съезжает ВЛЕВО,
+   закрывая RU, справа открывается ENG */
+.aiw-lang-knob {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #d6d2cc;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    z-index: 2;
+    transition: right 0.45s cubic-bezier(0.22, 0.61, 0.36, 1), background 0.4s ease;
+}
+
+/* состояние ENG: кружок уехал влево */
+.aiw-lang.aiw-eng .aiw-lang-knob { right: 51px; }
+.aiw-lang.aiw-eng .aiw-lang-ru   { opacity: 0; }
+.aiw-lang.aiw-eng .aiw-lang-eng  { opacity: 1; }
+.aiw-lang.aiw-eng .aiw-lang-ru   { left: 26px; }   /* RU под кружком */
+
+/* невидимая кнопка на всю капсулу */
+.aiw-lang-hit {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    z-index: 3;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.aiw-exit {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 24px;
+    border: 1px solid rgba(200, 196, 190, 0.22);
+    border-radius: 999px;
+    background: rgba(46, 48, 45, 0.7);
+    color: var(--aiw-ink-soft);
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color 0.3s, color 0.3s, box-shadow 0.3s;
+    backdrop-filter: blur(4px);
+}
+
+.aiw-exit:hover {
+    border-color: var(--aiw-accent);
+    color: var(--aiw-accent);
+    box-shadow: 0 8px 24px -12px var(--aiw-accent-soft);
+}
+
+.aiw-exit svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Back button: ghost keeps the width of the longest (RU) label,
+   so the button never changes size or line position on RUS/ENG */
+
+.aiw-exit-text {
+    position: relative;
+    display: inline-block;
+}
+
+.aiw-exit-text .aiw-ghost {
+    visibility: hidden;
+    white-space: nowrap;
+}
+
+.aiw-exit-text .aiw-live {
+    position: absolute;
+    top: 0;
+    left: 0;
+    white-space: nowrap;
+}
+
+/* --- РѕСЂРіР°РЅРёС‡РµСЃРєРёРµ РѕР±РѕР»РѕС‡РєРё --- */
+
+.aiw-field {
+    display: flex;
+    flex-wrap: wrap;
+    gap: clamp(28px, 5vw, 64px);
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.aiw-cell {
+    position: relative;
+    flex: 0 1 360px;
+    max-width: 400px;
+    aspect-ratio: 4 / 5;
+    /* parallax-СЃР»РѕР№: СЃРјРµС‰РµРЅРёРµ С‡РµСЂРµР· CSS-РїРµСЂРµРјРµРЅРЅС‹Рµ,
+       С‡С‚РѕР±С‹ РЅРµ РєРѕРЅС„Р»РёРєС‚РѕРІР°С‚СЊ СЃ GSAP-С‚СЂР°РЅСЃС„РѕСЂРјР°РјРё РѕР±РѕР»РѕС‡РєРё */
+    transform: translate3d(var(--aiw-tx, 0px), var(--aiw-ty, 0px), 0);
+    will-change: transform;
+}
+
+.aiw-cell .aiw-shell {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--aiw-radius-blob);
+    background: var(--aiw-shell);
+    box-shadow: var(--aiw-shadow);
+    overflow: hidden;
+    cursor: pointer;
+    transform-style: preserve-3d;
+    will-change: transform;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* РєР°Р¶РґР°СЏ РѕР±РѕР»РѕС‡РєР° РїРѕР»СѓС‡Р°РµС‚ СЃРѕР±СЃС‚РІРµРЅРЅСѓСЋ РѕСЂРіР°РЅРёС‡РµСЃРєСѓСЋ С„РѕСЂРјСѓ С‡РµСЂРµР· inline var --aiw-r */
+.aiw-shell .aiw-media,
+.aiw-shell .aiw-shell-veil,
+.aiw-shell .aiw-shell-meta {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+}
+
+.aiw-media {
+    overflow: hidden;
+    background: var(--aiw-bg-deep);
+}
+
+.aiw-media img,
+.aiw-media video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.aiw-media img {
+    filter: saturate(0.9) brightness(1.02);
+    transform: scale(1.04);
+    transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.5s;
+}
+
+.aiw-media video {
+    opacity: 0;
+    transition: opacity 0.7s ease;
+}
+
+.aiw-shell.aiw-playing .aiw-media video { opacity: 1; }
+.aiw-shell.aiw-playing .aiw-media img   { opacity: 0; }
+
+.aiw-shell:hover .aiw-media img {
+    transform: scale(1.09);
+}
+
+/* idle-РґРІРёР¶РµРЅРёРµ РґС‹С€РёС‚ РІРЅСѓС‚СЂРё media, parallax РґРІРёРіР°РµС‚ СЃР°РјСѓ РѕР±РѕР»РѕС‡РєСѓ вЂ”
+   С‚СЂР°РЅСЃС„РѕСЂРјС‹ РЅРµ РєРѕРЅС„Р»РёРєС‚СѓСЋС‚ */
+.aiw-shell .aiw-media {
+    will-change: transform;
+}
+
+.aiw-shell-veil {
+    background: linear-gradient(to top, rgba(43, 38, 34, 0.55) 0%, rgba(43, 38, 34, 0.12) 38%, transparent 62%);
+    pointer-events: none;
+    opacity: 0.85;
+    transition: opacity 0.4s;
+}
+
+.aiw-shell:hover .aiw-shell-veil { opacity: 1; }
+
+.aiw-shell-meta {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: flex-start;
+    padding: 34px;
+    pointer-events: none;
+}
+
+.aiw-shell-tag {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: #f4efe6;
+    opacity: 0.85;
+    margin-bottom: 10px;
+}
+
+.aiw-shell-name {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #fdfbf7;
+    line-height: 1.2;
+    text-shadow: 0 2px 18px rgba(43, 38, 34, 0.45);
+}
+
+.aiw-shell-glow {
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s;
+}
+
+.aiw-shell:hover .aiw-shell-glow { opacity: 1; }
+
+/* --- ПОРТАЛ: hero-композиция + окно в пространство --- */
+
+/* hero: текст слева, портал справа */
+.aiw-hero-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+}
+
+.aiw-hero-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.aiw-portal-slot {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-right: 2vw;
+}
+
+/* gravity: элементы hero слегка тянутся к порталу на hover */
+.aiw-hero-text h1,
+.aiw-hero-text p {
+    transition: transform 2.2s cubic-bezier(0.22, 0.61, 0.36, 1),
+                letter-spacing 2.2s cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: transform;
+}
+
+.aiw-hero-row.aiw-gravity .aiw-hero-text h1 {
+    transform: translate(10px, 0) rotate(0.35deg) scale(1.004);
+}
+
+.aiw-hero-row.aiw-gravity .aiw-hero-text p {
+    transform: translate(16px, 0) rotate(0.2deg);
+}
+
+.wrapper > header {
+    transition: transform 2.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: transform;
+}
+
+.wrapper > header.aiw-gravity {
+    transform: translate(6px, 0) rotate(-0.2deg) scale(0.999);
+}
+
+.grid {
+    transition: transform 2.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: transform;
+}
+
+.grid.aiw-gravity {
+    transform: translate(0, -6px) scale(0.996);
+}
+
+/* верхние карточки: каждая слегка подтягивается к порталу,
+   с индивидуальной силой (nth-child) — живая гравитация, не конвейер */
+.grid > .card {
+    transition: transform 2.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: transform;
+}
+
+.grid.aiw-gravity > .card:nth-child(1) {
+    /* верхняя-левая: тянется вправо-вверх */
+    transform: translate(9px, -5px) rotate(0.4deg) scale(1.006);
+}
+
+.grid.aiw-gravity > .card:nth-child(2) {
+    /* верхняя-правая: ближайшая к порталу — сильнее, микросжатие */
+    transform: translate(5px, -7px) rotate(-0.3deg) scale(0.994);
+}
+
+.grid.aiw-gravity > .card:nth-child(3) {
+    transform: translate(7px, -4px) rotate(0.25deg) scale(1.003);
+}
+
+.grid.aiw-gravity > .card:nth-child(4) {
+    transform: translate(6px, -3px) rotate(-0.2deg) scale(0.997);
+}
+
+/* карточки ниже — слабее (притяжение затухает с расстоянием) */
+.grid.aiw-gravity > .card:nth-child(n + 5) {
+    transform: translate(4px, -2px) rotate(0.15deg);
+}
+
+.aiw-portal-trigger {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    display: block;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.aiw-portal-core {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%,
+            #04060d 0%,
+            #030409 55%,
+            #020308 100%);
+    box-shadow:
+        0 0 34px rgba(0, 170, 220, 0.16),
+        0 0 80px rgba(0, 150, 200, 0.08),
+        inset 0 0 46px rgba(10, 16, 40, 0.9);
+    /* тонкое внутреннее кольцо — окантовка окна */
+    border: 2px solid rgba(0, 220, 255, 0.55);
+    border-radius: 50%;
+    transition: box-shadow 0.5s, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    overflow: hidden;
+}
+
+.aiw-portal-trigger:hover .aiw-portal-core {
+    transform: scale(1.03);
+    box-shadow:
+        0 0 46px rgba(0, 190, 235, 0.3),
+        0 0 110px rgba(0, 170, 215, 0.13),
+        inset 0 0 56px rgba(12, 20, 48, 0.95);
+}
+
+/* canvas «окна»: частицы, глубина, нити */
+.aiw-portal-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.aiw-portal-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 190, 230, 0.28);
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* кольца вращаются с разной скоростью — живая воронка */
+.aiw-portal-ring.r1 { inset: 0;    border-style: dashed; }
+.aiw-portal-ring.r2 { inset: 10px; border-color: rgba(0, 190, 230, 0.18); }
+.aiw-portal-ring.r3 { inset: 22px; border-style: dotted; border-color: rgba(0, 190, 230, 0.14); }
+
+.aiw-portal-label {
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 16px);
+    transform: translateX(-50%);
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: rgba(0, 200, 240, 0.85);
+    opacity: 0.55;
+    white-space: nowrap;
+    text-shadow: 0 0 10px rgba(0, 200, 240, 0.3);
+    transition: opacity 1.2s ease;
+}
+
+.aiw-portal-trigger:hover .aiw-portal-label { opacity: 1; }
+
+/* --- РѕРІРµСЂР»РµР№ РїРµСЂРµС…РѕРґР° --- */
+
+.aiw-transition {
+    position: fixed;
+    inset: 0;
+    z-index: 9500;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    background: transparent;
+}
+
+.aiw-transition.aiw-visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.aiw-transition-burst {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #ffffff 0%, #f7f1e6 40%, rgba(247, 241, 230, 0) 70%);
+    transform: scale(0);
+}
+
+/* С‚С‘РјРЅР°СЏ РІСѓР°Р»СЊ РѕР±СЂР°С‚РЅРѕРіРѕ РїРѕСЂС‚Р°Р»Р°: СЂР°СЃРїРѕР»Р·Р°РµС‚СЃСЏ РѕС‚ С†РµРЅС‚СЂР° */
+.aiw-transition-veil {
+    position: absolute;
+    inset: 0;
+    background: #050507;
+    transform: scale(0);
+    opacity: 1;
+}
+
+/* --- fullscreen cinematic viewer --- */
+
+.aiw-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 9600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(244, 239, 230, 0);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: none;
+}
+
+.aiw-viewer.aiw-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    background: rgba(33, 35, 33, 0.94);
+    backdrop-filter: blur(18px);
+}
+
+.aiw-viewer-stage {
+    position: relative;
+    width: min(92vw, 1400px);
+    aspect-ratio: 16 / 9;
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 50px 120px -30px rgba(70, 55, 40, 0.5);
+    background: #191512;
+    will-change: transform, opacity;
+}
+
+.aiw-viewer-stage video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    background: #191512;
+}
+
+.aiw-viewer-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -70px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 6px;
+}
+
+.aiw-viewer-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--aiw-ink);
+}
+
+.aiw-viewer-tag {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--aiw-ink-soft);
+}
+
+.aiw-viewer-close {
+    position: absolute;
+    top: -54px;
+    right: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(70, 55, 40, 0.25);
+    border-radius: 999px;
+    padding: 9px 20px;
+    background: rgba(46, 48, 45, 0.8);
+    color: var(--aiw-ink-soft);
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.3s, border-color 0.3s;
+}
+
+.aiw-viewer-close:hover {
+    color: var(--aiw-accent);
+    border-color: var(--aiw-accent);
+}
+
+/* кнопка native fullscreen: в ряд с Close, слева */
+.aiw-viewer-fs {
+    position: absolute;
+    top: -54px;
+    left: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(200, 196, 190, 0.22);
+    border-radius: 999px;
+    padding: 9px 20px;
+    background: rgba(46, 48, 45, 0.8);
+    color: var(--aiw-ink-soft);
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.3s, border-color 0.3s;
+}
+
+.aiw-viewer-fs:hover {
+    color: var(--aiw-accent);
+    border-color: var(--aiw-accent);
+}
+
+.aiw-viewer-fs svg {
+    width: 13px;
+    height: 13px;
+}
+
+/* --- РјРѕР±РёР»СЊРЅР°СЏ РІРµСЂСЃРёСЏ --- */
+
+@media (max-width: 768px) {
+    .aiw-container { padding: 28px 18px 100px; }
+    .aiw-header { margin-bottom: 18px; }   /* video closer to header */
+    .aiw-sub { font-size: 15px; }
+
+.aiw-cell {
+        flex: 1 1 100%;
+        max-width: 420px;
+    }
+
+    .aiw-shell-meta { padding: 26px; }
+    .aiw-shell-name { font-size: 19px; }
+
+    /* mobile: портал СПРАВА НАПРОТИВ заголовка Digital Alchemy */
+    .aiw-hero-row {
+        flex-direction: row;
+        align-items: flex-start;   /* портал выровнен по верху заголовка */
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .aiw-portal-slot {
+        flex: 0 0 auto;
+        padding: 0;
+        width: auto;
+        justify-content: flex-end;
+    }
+
+    .aiw-portal-trigger {
+        width: 110px;   /* уменьшен, чтобы встать напротив заголовка */
+        height: 110px;
+        margin-top: -18px;  /* чуть выше верхней линии: оптически «напротив» DIGITAL */
+        max-width: none;
+        max-height: none;
+    }
+
+    /* mobile (ВАРИАНТ B): label в 3 строки СЛЕВА от портала —
+       не вылезает за экран и не перекрывает текст описания */
+    .aiw-portal-label {
+        left: auto;
+        right: calc(100% + 8px);   /* прижат к левому краю круга */
+        top: 50%;
+        transform: translateY(-50%);
+        width: 70px;
+        text-align: right;
+        white-space: normal;        /* перенос: ENTER / LITTLE / WORLD */
+        line-height: 1.5;
+        letter-spacing: 3px;
+        font-size: 9px;
+    }
+
+    .aiw-viewer-stage {
+        width: 94vw;
+        border-radius: 18px;
+    }
+
+    .aiw-viewer-close { top: -48px; }
+    .aiw-viewer-bar { bottom: -64px; }
+    .aiw-viewer-name { font-size: 15px; }
+}
+
+/* --- prefers-reduced-motion --- */
+
+@media (prefers-reduced-motion: reduce) {
+    .aiw-root,
+    .aiw-shell,
+    .aiw-media img,
+    .aiw-media video,
+    .aiw-portal-core,
+    .aiw-portal-ring,
+    .aiw-portal-label,
+    .aiw-transition,
+    .aiw-viewer {
+        transition: opacity 0.35s ease !important;
+        animation: none !important;
+    }
+
+    .aiw-shell:hover .aiw-media img { transform: scale(1.04); }
+    .aiw-portal-trigger:hover .aiw-portal-core { transform: none; }
+}

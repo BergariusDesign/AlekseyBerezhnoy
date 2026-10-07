@@ -1,0 +1,9 @@
+name = "aleksey-portfolio-stats"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+
+# D1 привязка. database_id подставь свой (см. README, шаг 2).
+[[d1_databases]]
+binding = "DB"
+database_name = "portfolio-stats"
+database_id = "a18c0066-4591-4a13-9406-bd11128e1f51"
