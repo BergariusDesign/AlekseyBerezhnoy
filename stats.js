@@ -251,33 +251,108 @@
             return;
         }
 
-        // рендер в существующем виде (.stat-row / .stat-name / .stat-val)
-        var html = '';
-        res.data.videos.forEach(function (v) {
-            var name = v.name || v.id;
-            var val =
-                v.total + ' views' +
-                ' · ' + v.today + ' today' +
-                ' · ' + v.last7 + ' / 7d' +
-                ' · ' + v.month + ' month';
-            html +=
-                '<div class="stat-row">' +
-                    '<span class="stat-name">' + name + '</span>' +
-                    '<span class="stat-val">' + val + '</span>' +
-                '</div>';
-        });
+        /* --- ADMIN DASHBOARD UI: компактная панель статистики ---
+           Названия нормализуются на frontend (D1 не меняем):
+           понятные имена видео + даты в формате DD.MM.YYYY. */
+        var DISPLAY_NAMES = {
+            'magic':    'The Only Wall is You',
+            'showreel': 'Showreel',
+            'woman':    'AI Woman',
+            'watch':    'Watch',
+            'm1':       'M1 — Little World',
+            'm2':       'M2 — Little World',
+            'm3':       'M3 — Little World',
+            'm4':       'M4 — Little World'
+        };
 
-        if (res.data.daily && res.data.daily.length) {
-            var total = res.data.daily.reduce(function (s, d) { return s + d.count; }, 0);
-            var last = res.data.daily[res.data.daily.length - 1];
-            html +=
-                '<div class="stat-row">' +
-                    '<span class="stat-name">LAST 30 DAYS</span>' +
-                    '<span class="stat-val">' + total + ' views</span>' +
-                '</div>';
+        function fmtDate(iso) {
+            if (!iso) return '—';
+            var d = new Date(iso + (iso.length === 10 ? 'T00:00:00Z' : ''));
+            if (isNaN(d.getTime())) return iso;
+            var p = function (n) { return (n < 10 ? '0' : '') + n; };
+            return p(d.getUTCDate()) + '.' + p(d.getUTCMonth() + 1) + '.' + d.getUTCFullYear();
         }
 
-        statsList.innerHTML = html || '<div style="color:#888">Пока нет данных.</div>';
+        function sumCard(label, value) {
+            return '<div class="stats-sum-card">' +
+                '<div class="stats-sum-label">' + label + '</div>' +
+                '<div class="stats-sum-value">' + value + '</div>' +
+            '</div>';
+        }
+
+        var videos = res.data.videos || [];
+        var totalViews = 0, lastActivity = '';
+        videos.forEach(function (v) { totalViews += (v.total || 0); });
+
+        // последняя активность: максимум по lastView всех видео + daily
+        (res.data.daily || []).forEach(function (d) {
+            if (d.day && d.day > lastActivity) lastActivity = d.day;
+        });
+        videos.forEach(function (v) {
+            var lv = (v.lastView || '').slice(0, 10);
+            if (lv && lv > lastActivity) lastActivity = lv;
+        });
+
+        // сортировка: по количеству просмотров (DESC)
+        videos.sort(function (a, b) { return (b.total || 0) - (a.total || 0); });
+
+        var css =
+            '.stats-dashboard{font-family:inherit;}' +
+            '.stats-summary{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px;}' +
+            '.stats-sum-card{flex:1 1 90px;background:rgba(0,255,255,.04);' +
+                'border:1px solid rgba(0,255,255,.14);border-radius:10px;padding:10px 12px;}' +
+            '.stats-sum-label{font-size:10px;letter-spacing:1.5px;color:#8a8a8a;' +
+                'text-transform:uppercase;margin-bottom:3px;}' +
+            '.stats-sum-value{font-size:20px;font-weight:700;color:#00e5ff;font-family:var(--font-tech, monospace);}' +
+            '.stats-table{display:flex;flex-direction:column;gap:6px;}' +
+            '.stats-head{display:flex;align-items:baseline;gap:12px;padding:0 4px 4px;' +
+                'border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:2px;}' +
+            '.stats-h-title{flex:1;font-size:10px;letter-spacing:1.5px;color:#8a8a8a;text-transform:uppercase;}' +
+            '.stats-h-views,.stats-h-last{font-size:10px;letter-spacing:1.5px;color:#8a8a8a;text-transform:uppercase;}' +
+            '.stats-h-views{width:64px;text-align:right;}' +
+            '.stats-h-last{width:92px;text-align:right;}' +
+            '.stats-v-row{display:flex;align-items:center;gap:12px;padding:8px 4px;' +
+                'background:rgba(255,255,255,.02);border-radius:8px;}' +
+            '.stats-v-name{flex:1;font-size:13px;color:#e8e8e8;overflow:hidden;' +
+                'text-overflow:ellipsis;white-space:nowrap;}' +
+            '.stats-v-views{width:64px;text-align:right;font-size:18px;font-weight:700;' +
+                'color:#00e5ff;font-family:var(--font-tech, monospace);}' +
+            '.stats-v-last{width:92px;text-align:right;font-size:11px;color:#8a8a8a;' +
+                'font-family:var(--font-tech, monospace);}' +
+            '@media (max-width:600px){.stats-sum-card{flex:1 1 100%;}' +
+                '.stats-v-views{width:52px;}.stats-v-last{width:80px;}}';
+
+        var html = '<style>' + css + '</style>' +
+            '<div class="stats-dashboard">' +
+                '<div class="stats-summary">' +
+                    sumCard('Total views', totalViews) +
+                    sumCard('Videos', videos.length) +
+                    sumCard('Last activity', lastActivity ? fmtDate(lastActivity) : '—') +
+                '</div>' +
+                '<div class="stats-table">' +
+                    '<div class="stats-head">' +
+                        '<span class="stats-h-title">Video</span>' +
+                        '<span class="stats-h-views">Views</span>' +
+                        '<span class="stats-h-last">Last view</span>' +
+                    '</div>';
+
+        if (videos.length) {
+            videos.forEach(function (v) {
+                html +=
+                    '<div class="stats-v-row">' +
+                        '<span class="stats-v-name">' +
+                            (DISPLAY_NAMES[v.id] || v.name || v.id) + '</span>' +
+                        '<span class="stats-v-views">' + (v.total || 0) + '</span>' +
+                        '<span class="stats-v-last">' + fmtDate((v.lastView || '').slice(0, 10)) + '</span>' +
+                    '</div>';
+            });
+        } else {
+            html += '<div style="color:#888;padding:10px 4px;">Пока нет данных.</div>';
+        }
+
+        html += '</div></div>';
+
+        statsList.innerHTML = html;
     };
 
     // выход: удаляем серверную сессию и закрываем модалку как раньше
