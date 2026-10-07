@@ -160,6 +160,7 @@ async function getStats(db) {
             COUNT(w.id) AS total,
             SUM(CASE WHEN w.viewed_at >= date('now', 'start of day', 'utc') THEN 1 ELSE 0 END) AS today,
             SUM(CASE WHEN w.viewed_at >= date('now', '-6 days', 'start of day', 'utc') THEN 1 ELSE 0 END) AS last7,
+            SUM(CASE WHEN w.viewed_at >= date('now', '-29 days', 'start of day', 'utc') THEN 1 ELSE 0 END) AS last30,
             SUM(CASE WHEN w.viewed_at >= date('now', 'start of month', 'utc') THEN 1 ELSE 0 END) AS month,
             MAX(w.viewed_at) AS last_view
         FROM videos v
@@ -177,6 +178,15 @@ async function getStats(db) {
         ORDER BY day
     `).all();
 
+    // daily BY VIDEO: для фильтра графика по конкретному видео (admin UI)
+    const dailyByVideo = await db.prepare(`
+        SELECT video_id, date(viewed_at) AS day, COUNT(*) AS count
+        FROM views
+        WHERE viewed_at >= date('now', '-29 days', 'start of day', 'utc')
+        GROUP BY video_id, date(viewed_at)
+        ORDER BY day
+    `).all();
+
     return {
         videos: rows.results.map(r => ({
             id: r.video_id,
@@ -184,10 +194,13 @@ async function getStats(db) {
             total: r.total || 0,
             today: r.today || 0,
             last7: r.last7 || 0,
+            last30: r.last30 || 0,
             month: r.month || 0,
             lastView: r.last_view || null
         })),
-        daily: daily.results.map(d => ({ day: d.day, count: d.count }))
+        daily: daily.results.map(d => ({ day: d.day, count: d.count })),
+        dailyByVideo: dailyByVideo.results.map(d =>
+            ({ id: d.video_id, day: d.day, count: d.count }))
     };
 }
 

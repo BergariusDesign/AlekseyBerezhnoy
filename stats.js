@@ -265,6 +265,24 @@
             'm4':       'M4 — Little World'
         };
 
+        var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+        // '06 Oct' — человекочитаемый формат для таблицы
+        function fmtDay(iso) {
+            if (!iso) return '—';
+            var d = new Date(iso.slice(0, 10) + 'T00:00:00Z');
+            if (isNaN(d.getTime())) return iso;
+            var dd = d.getUTCDate();
+            return (dd < 10 ? '0' : '') + dd + ' ' + MONTHS[d.getUTCMonth()];
+        }
+
+        function esc(s) {
+            return String(s).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
+
         function fmtDate(iso) {
             if (!iso) return '—';
             var d = new Date(iso + (iso.length === 10 ? 'T00:00:00Z' : ''));
@@ -281,58 +299,153 @@
         }
 
         var videos = res.data.videos || [];
-        var totalViews = 0, lastActivity = '';
-        videos.forEach(function (v) { totalViews += (v.total || 0); });
+        var daily = res.data.daily || [];
+        var dailyByVideo = res.data.dailyByVideo || [];
 
-        // последняя активность: максимум по lastView всех видео + daily
-        (res.data.daily || []).forEach(function (d) {
-            if (d.day && d.day > lastActivity) lastActivity = d.day;
-        });
+        // summary: реальные данные API (total/today/last7/last30)
+        var totalViews = 0, todayViews = 0, last7Views = 0, last30Views = 0;
         videos.forEach(function (v) {
-            var lv = (v.lastView || '').slice(0, 10);
-            if (lv && lv > lastActivity) lastActivity = lv;
+            totalViews += (v.total || 0);
+            todayViews += (v.today || 0);
+            last7Views += (v.last7 || 0);
+            last30Views += (v.last30 || 0);
         });
+
+        /* --- ось дней: последние 30 дней включительно, zero-fill ---
+           Единая timezone UTC: D1 пишет viewed_at в UTC и date(viewed_at)
+           даёт календарный день UTC — frontend согласован, просмотры у
+           полуночи не попадают в другой день. */
+        function dayKey(offsetDays) {
+            var d = new Date();
+            d.setUTCHours(0, 0, 0, 0);
+            d.setUTCDate(d.getUTCDate() - offsetDays);
+            var p = function (n) { return (n < 10 ? '0' : '') + n; };
+            return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate());
+        }
+        var days = [];
+        for (var o = 29; o >= 0; o--) days.push(dayKey(o));
+
+        var allByDay = {};
+        daily.forEach(function (d) { allByDay[d.day] = (allByDay[d.day] || 0) + d.count; });
+        var byVideoDay = {};
+        dailyByVideo.forEach(function (d) {
+            byVideoDay[d.id] = byVideoDay[d.id] || {};
+            byVideoDay[d.id][d.day] = (byVideoDay[d.id][d.day] || 0) + d.count;
+        });
+
+        function seriesFor(videoId) {
+            if (videoId === 'all') return days.map(function (k) { return allByDay[k] || 0; });
+            var m = byVideoDay[videoId] || {};
+            return days.map(function (k) { return m[k] || 0; });
+        }
+
+        /* --- SVG bar chart: без библиотек, каждый день на оси --- */
+        function renderChart(videoId) {
+            var series = seriesFor(videoId);
+            var W = 640, H = 130, PAD_B = 18, PAD_T = 8;
+            var max = Math.max.apply(null, series.concat([1]));
+            var bw = W / series.length;
+            var bars = '', labels = '';
+            series.forEach(function (v, i) {
+                var h = Math.round((v / max) * (H - PAD_B - PAD_T));
+                var x = (i * bw + 1).toFixed(1);
+                var y = (H - PAD_B - h).toFixed(1);
+                var w = Math.max(1, bw - 2).toFixed(1);
+                bars += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + Math.max(h, 1) + '" rx="1.5" fill="' +
+                    (v ? 'rgba(0,229,255,.75)' : 'rgba(255,255,255,.06)') + '"></rect>';
+                if (i % 5 === 0 || i === series.length - 1) {
+                    labels += '<text x="' + ((i * bw + bw / 2).toFixed(1)) + '" y="' + (H - 4) +
+                        '" text-anchor="middle" font-size="8" fill="#8a8a8a">' + fmtDay(days[i]).slice(0, 6) + '</text>';
+                }
+            });
+            var grid = '<line x1="0" y1="' + (H - PAD_B) + '" x2="' + W + '" y2="' + (H - PAD_B) +
+                '" stroke="rgba(255,255,255,.12)" stroke-width="1"></line>';
+            return '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" class="stats-chart" role="img" ' +
+                'aria-label="Views per day, last 30 days">' + bars + grid + labels + '</svg>';
+        }
+
+        // фильтр графика (persist между вызовами loadAdminStats)
+        window.__statsChartFilter = window.__statsChartFilter || 'all';
+        var chartFilter = window.__statsChartFilter;
+
+        function filterSelect() {
+            var opts = '<option value="all">ALL VIDEOS</option>';
+            videos.forEach(function (v) {
+                opts += '<option value="' + esc(v.id) + '">' +
+                    esc(DISPLAY_NAMES[v.id] || v.name || v.id) + '</option>';
+            });
+            return '<select id="stats-filter" class="stats-filter">' + opts + '</select>';
+        }
 
         // сортировка: по количеству просмотров (DESC)
         videos.sort(function (a, b) { return (b.total || 0) - (a.total || 0); });
 
-        var css =
+                var css =
             '.stats-dashboard{font-family:inherit;}' +
+            '.stats-dash-title{font-size:11px;letter-spacing:2.5px;color:#8a8a8a;' +
+                'text-transform:uppercase;margin:0 0 10px;}' +
             '.stats-summary{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px;}' +
-            '.stats-sum-card{flex:1 1 90px;background:rgba(0,255,255,.04);' +
+            '.stats-sum-card{flex:1 1 100px;background:rgba(0,255,255,.04);' +
                 'border:1px solid rgba(0,255,255,.14);border-radius:10px;padding:10px 12px;}' +
             '.stats-sum-label{font-size:10px;letter-spacing:1.5px;color:#8a8a8a;' +
                 'text-transform:uppercase;margin-bottom:3px;}' +
             '.stats-sum-value{font-size:20px;font-weight:700;color:#00e5ff;font-family:var(--font-tech, monospace);}' +
+            '.stats-block-title{font-size:11px;letter-spacing:2.5px;color:#8a8a8a;' +
+                'text-transform:uppercase;margin:18px 0 8px;}' +
+            '.stats-filter{background:#0a0a0a;color:#e8e8e8;border:1px solid rgba(0,255,255,.2);' +
+                'border-radius:8px;padding:6px 10px;font-family:var(--font-tech, monospace);' +
+                'font-size:11px;letter-spacing:1px;cursor:pointer;outline:none;max-width:100%;}' +
+            '.stats-chart-wrap{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);' +
+                'border-radius:10px;padding:10px 6px 4px;margin-top:8px;}' +
+            '.stats-chart{display:block;width:100%;height:130px;}' +
             '.stats-table{display:flex;flex-direction:column;gap:6px;}' +
-            '.stats-head{display:flex;align-items:baseline;gap:12px;padding:0 4px 4px;' +
+            '.stats-head{display:flex;align-items:baseline;gap:10px;padding:0 4px 4px;' +
                 'border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:2px;}' +
             '.stats-h-title{flex:1;font-size:10px;letter-spacing:1.5px;color:#8a8a8a;text-transform:uppercase;}' +
-            '.stats-h-views,.stats-h-last{font-size:10px;letter-spacing:1.5px;color:#8a8a8a;text-transform:uppercase;}' +
-            '.stats-h-views{width:64px;text-align:right;}' +
-            '.stats-h-last{width:92px;text-align:right;}' +
-            '.stats-v-row{display:flex;align-items:center;gap:12px;padding:8px 4px;' +
+            '.stats-h-title,.stats-h-views,.stats-h-today,.stats-h-7d,.stats-h-30d,.stats-h-last{font-size:10px;letter-spacing:1.5px;color:#8a8a8a;text-transform:uppercase;}' +
+            '.stats-h-views{width:48px;text-align:right;}' +
+            '.stats-h-today,.stats-h-7d,.stats-h-30d{width:52px;text-align:right;}' +
+            '.stats-h-last{width:64px;text-align:right;}' +
+            '.stats-v-row{display:flex;align-items:center;gap:10px;padding:8px 4px;' +
                 'background:rgba(255,255,255,.02);border-radius:8px;}' +
-            '.stats-v-name{flex:1;font-size:13px;color:#e8e8e8;overflow:hidden;' +
+            '.stats-v-name{flex:1;font-size:12px;color:#e8e8e8;overflow:hidden;' +
                 'text-overflow:ellipsis;white-space:nowrap;}' +
-            '.stats-v-views{width:64px;text-align:right;font-size:18px;font-weight:700;' +
+            '.stats-v-views{width:48px;text-align:right;font-size:16px;font-weight:700;' +
                 'color:#00e5ff;font-family:var(--font-tech, monospace);}' +
-            '.stats-v-last{width:92px;text-align:right;font-size:11px;color:#8a8a8a;' +
+            '.stats-v-today,.stats-v-7d,.stats-v-30d{width:52px;text-align:right;font-size:12px;' +
+                'color:#c8c8c8;font-family:var(--font-tech, monospace);}' +
+            '.stats-v-last{width:64px;text-align:right;font-size:11px;color:#8a8a8a;' +
                 'font-family:var(--font-tech, monospace);}' +
-            '@media (max-width:600px){.stats-sum-card{flex:1 1 100%;}' +
-                '.stats-v-views{width:52px;}.stats-v-last{width:80px;}}';
+            '@media (max-width:600px){' +
+                '.stats-sum-card{flex:1 1 40%;}' +
+                '.stats-table{overflow-x:auto;}' +
+                '.stats-v-row,.stats-head{min-width:430px;}' +
+                '.stats-chart{height:110px;}}';
 
         var html = '<style>' + css + '</style>' +
             '<div class="stats-dashboard">' +
+                '<div class="stats-dash-title">VIDEO STATISTICS</div>' +
                 '<div class="stats-summary">' +
                     sumCard('Total views', totalViews) +
-                    sumCard('Videos', videos.length) +
-                    sumCard('Last activity', lastActivity ? fmtDate(lastActivity) : '—') +
+                    sumCard('Today', todayViews) +
+                    sumCard('Last 7 days', last7Views) +
+                    sumCard('Last 30 days', last30Views) +
                 '</div>' +
+
+                '<div class="stats-block-title">VIEWS OVER TIME</div>' +
+                filterSelect() +
+                '<div class="stats-chart-wrap" id="stats-chart-wrap">' +
+                    renderChart(chartFilter) +
+                '</div>' +
+
+                '<div class="stats-block-title">VIDEO PERFORMANCE</div>' +
                 '<div class="stats-table">' +
                     '<div class="stats-head">' +
                         '<span class="stats-h-title">Video</span>' +
                         '<span class="stats-h-views">Views</span>' +
+                        '<span class="stats-h-today">Today</span>' +
+                        '<span class="stats-h-7d">7d</span>' +
+                        '<span class="stats-h-30d">30d</span>' +
                         '<span class="stats-h-last">Last view</span>' +
                     '</div>';
 
@@ -341,9 +454,12 @@
                 html +=
                     '<div class="stats-v-row">' +
                         '<span class="stats-v-name">' +
-                            (DISPLAY_NAMES[v.id] || v.name || v.id) + '</span>' +
+                            esc(DISPLAY_NAMES[v.id] || v.name || v.id) + '</span>' +
                         '<span class="stats-v-views">' + (v.total || 0) + '</span>' +
-                        '<span class="stats-v-last">' + fmtDate((v.lastView || '').slice(0, 10)) + '</span>' +
+                        '<span class="stats-v-today">' + (v.today || 0) + '</span>' +
+                        '<span class="stats-v-7d">' + (v.last7 || 0) + '</span>' +
+                        '<span class="stats-v-30d">' + (v.last30 || 0) + '</span>' +
+                        '<span class="stats-v-last">' + fmtDay((v.lastView || '').slice(0, 10)) + '</span>' +
                     '</div>';
             });
         } else {
@@ -353,6 +469,17 @@
         html += '</div></div>';
 
         statsList.innerHTML = html;
+
+        // фильтр графика: перерисовка SVG без нового fetch
+        var sel = document.getElementById('stats-filter');
+        if (sel) {
+            sel.value = chartFilter;
+            sel.addEventListener('change', function () {
+                window.__statsChartFilter = sel.value;
+                var wrap = document.getElementById('stats-chart-wrap');
+                if (wrap) wrap.innerHTML = renderChart(sel.value);
+            });
+        }
     };
 
     // выход: удаляем серверную сессию и закрываем модалку как раньше
